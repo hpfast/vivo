@@ -7,7 +7,6 @@ The name is just 'cause we need one -- 'short and memorable' per Github's recomm
 
 
 - [ ] try out tasks like this.
-
 - [x] this is supposedly a completed one referencing this @tag
 
 
