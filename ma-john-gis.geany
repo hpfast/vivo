@@ -15,6 +15,7 @@ indent_mode=3
 [project]
 name=ma-john-gis
 base_path=/home/hans/priv/vivo
+description=
 
 [long line marker]
 long_line_behaviour=1
@@ -23,6 +24,9 @@ long_line_column=72
 [files]
 current_page=0
 FILE_NAME_0=2570;None;0;EUTF-8;1;1;1;%2Fhome%2Fhans%2Fvivo-workflow.txt;0;4
+FILE_NAME_1=2313;Markdown;0;EUTF-8;1;1;1;%2Fhome%2Fhans%2Fpriv%2Fvivo%2Fdoc%2Fdata-setup-import.md;0;4
+FILE_NAME_2=0;SQL;0;EUTF-8;1;1;1;%2Fhome%2Fhans%2Fpriv%2Fvivo%2Fsql%2Fimport.sql;0;4
+FILE_NAME_3=46;SQL;0;EUTF-8;1;1;1;%2Fhome%2Fhans%2Fpriv%2Fvivo%2Fsql%2Fhospital-locations-scratchpad.sql;0;4
 
 [VTE]
 last_dir=/home/hans
