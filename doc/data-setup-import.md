@@ -5,9 +5,9 @@ Setting up the data and importing data -- general notes
 General notes -- see reference SQL files for install procedures.
 
 
-The setup of the database is a schema `drc-admin and a schema  `hospitals. The first is for generated administrative boundary geometries which will be useable outside this project, and the second is for the analytical tables for this project. Keep the schemas clean by documenting edit steps well and cleaning up unused tables.
+The setup of the database is a schema `drc-admin` and a schema  `hospitals`. The first is for generated administrative boundary geometries which will be useable outside this project, and the second is for the analytical tables for this project. Keep the schemas clean by documenting edit steps well and cleaning up unused tables.
 
-We will finally be using tables `hospitals `distances `cities and maybe some others.
+We will finally be using tables `hospitals` `distances` `cities` and maybe some others.
 
 ##Inventory of tables -- what to do with them?
 
@@ -31,7 +31,7 @@ First table is cities of Congo. We are importing this from a shapefile using ogr
 
 #DRC Airports
 
-Next is airports. Importing from CSV with geometrty fields we will use `ogr2ogr and a 'virtual format' file.
+Next is airports. Importing from CSV with geometry fields we will use `ogr2ogr` and a 'virtual format' file.
 
 Create a VRT file with the following format:
 
@@ -48,6 +48,118 @@ and save it with the name airports.vrt. Note that the OGRVRTLayer name attribute
 
 Now you can import into PostgreSQL using ogr2ogr:
 
+	ogr2ogr -f "PostgreSQL" PG:"dbname=geodrc" -nln airports -nlt POINT -lco SCHEMA=drc_admin -lco OVERWRITE=YES airports.vrt
+
+#healthzones
+
+Healthzones come from a shapefile. The geometries are not very good: the polygons don't match up very well. Before importing, I cleaned it up with pprepair:
+
+	pprepair --i INPUTFILE.shp -o healthzones_fixed.shp -fix
+	
+Then import the shapefile into PostgreSQL with ogr2ogr:
+
+    ogr2ogr -f "PostgreSQL" PG:"host=localhost dbname=geodrc user=USER password=PASSWORD" -nln healthzones -nlt POINT -lco SCHEMA=drc_admin healthzones_fixed.shp
+
+#Locating hospitals
 
 
+We are trying to find locations for hospitals by using the healthzone polygons. We join to cities by name to get the most likely location, assuming that the hospital for a healthzone will most often be in the populated place of the same name as the healthzone. We then process the remaining ones and mark those that are questionable.
+
+## hospital locations first pass
+
+### join to cities by name
+
+Try to locate as many hospitals with a name join to the cities table. We add the further constraint that the cities must be spatially contained by the geometry of the health zone
+
+	create table hospitals.test_join_with_contains as select
+		a.name,
+		a.wkb_geometry as point,
+		b.ZS as name_hz,
+	b.wkb_geometry as pol
+	from
+		drc_admin.cities a,
+		drc_admin.healthzones b
+	where
+		a.name = b.ZS
+	and
+		st_contains(b.wkb_geometry, a.wkb_geometry)
+	;
+	--490
+
+This gives fairly good results. Let's go ahead and find the centroids of the unmatched zones and store them in a temporary table. We'll add those in once we've removed the duplicates from this last step.
+
+### using st_centroid for unmatched healthzones
+
+	create table hospitals.centroids_unmatched_healthzones as select
+		ZS as name,
+		st_centroid(wkb_geometry) as point
+	from
+		drc_admin.healthzones
+	where
+		ZS not in (select name_api from hospitals.test_join_with_contains)
+	;
+	--Query returned successfully: 234 rows affected, 395 ms execution time.
+
+## hospitals second pass -- removing duplicates in clusters
+
+Taking the results of our first pass, we will try to select one location from the duplicates. We will do this by:
+
+- where there is one point, select it and indicate as most certain
+
+- where all points are less than 10km apart, we'll take the closest one at random and indicate this as the most certain.
+
+- where points are more than 10km apart, we'll take the one closest to the centroid of the polygon and indicate this as doubtful.
+
+
+### 1. create target table
+
+	create table hospitals.dedup1 (
+		point geometry(point,4326),
+		name text,
+		certainty text
+	);
+		
+### 2. insert hospitals with exactly one match from previous step
+
+	alter table hospitals.test_join_with_contains add column gid serial;
+
+	with preselect as (
+		select
+			name,
+			count(name) as count
+		from
+			hospitals.test_join_with_contains
+		group by
+			name
+		)
+		
+	insert into hospitals.dedup1
+	select
+		a.point,
+		a.name,
+		'single match'
+	from
+		hospitals.test_join_with_contains a,
+		preselect
+	where
+		a.name = preselect.name
+	and
+		preselect.count = 1
+	;
+	--139
+	
+### 3. insert hospitals with two matches less than 10 km apart
+
+* create a pairs table with distances between points in healthzone (where count = 2)
+* select only those where distance is 10km or less (table pairs10k)
+* from this, we can select 1 at random using gid.
+
+
+
+## hospitals third pass -- removing 
+
+
+## hospitals final -- assembling final table
+
+#final hospitals table with custom attributes
 
