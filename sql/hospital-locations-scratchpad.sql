@@ -1,8 +1,25 @@
 ﻿drop table hospitals.test_join_with_contains;
 
+select count(*) from drc_admin.healthzones_fixed limit 10;
+
+--join the little polygons that pprepair added.
+--NOTE alters ogc_fids.
+drop table drc_admin.hz;
+create table drc_admin.hz as select
+	min(ogc_fid) as ogc_fid, st_union(wkb_geometry) as wkb_geometry, zs, lvlid, sourceyear, lvlld, source, provname, name_api, partenaire, gavi
+from drc_admin.healthzones_fixed
+group by zs, lvlid, sourceyear, lvlld, source, provname, name_api, partenaire, gavi
+;--518
+
+-- add a primary key
+alter table drc_admin.hz add column gid serial primary key not null;
+
+select * from drc_admin.healthzones_fixed where ogc_fid not in (select ogc_fid from drc_admin.hz);
+
 update drc_admin.healthzones_fixed set wkb_geometry = st_setsrid(wkb_geometry,4326);
 
 
+drop table hospitals.test_join_with_contains;
 create table hospitals.test_join_with_contains as select
 	a.name,
 	a.wkb_geometry as point,
@@ -10,12 +27,17 @@ create table hospitals.test_join_with_contains as select
 b.wkb_geometry as pol
 from
 	drc_admin.cities a,
-	drc_admin.healthzones_fixed b
+	drc_admin.hz b
 where
 	a.name = b.ZS
 and
 	st_contains(b.wkb_geometry, a.wkb_geometry)
-;
+;--490. So only 28 missing.
+
+--add gid
+alter table hospitals.test_join_with_contains add column gid serial;
+
+
 	
 drop table hospitals.centroids_unmatched_healthzones;
 
@@ -23,11 +45,11 @@ create table hospitals.centroids_unmatched_healthzones as select
 	ZS as name,
 	st_centroid(wkb_geometry) as point
 from
-	drc_admin.healthzones_fixed
+	drc_admin.hz
 where
 	ZS not in (select name from hospitals.test_join_with_contains)
 ;
---Query returned successfully: 234 rows affected, 395 ms execution time.
+--Query returned successfully: 226 rows affected, 395 ms execution time.
 
 drop table hospitals.dedup1;
 create table hospitals.dedup1 (
@@ -63,11 +85,9 @@ and
 ;
 --139
 
-alter table hospitals.test_join_with_contains add column gid serial;
 
 
-
------
+----
 drop table hospitals.pairs;
 with preselect as (
 	select
@@ -84,6 +104,7 @@ select st_distance(
 		geography(st_transform(r.point,4326)),
 		geography(st_transform(j.point,4326))
 		) as distance,
+		r.point,
 	 r.gid as rgid, j.gid as jgid, r.name
 into hospitals.pairs
 from
@@ -100,6 +121,7 @@ alter table hospitals.pairs add column sid serial;
 delete from hospitals.pairs where sid in (select max(sid) from hospitals.pairs group by name);	
 --117 deleted. check.
 
+drop table hospitals.pairs_10k;
 create table hospitals.pairs_10k as select
 	a.*
 from
@@ -133,7 +155,7 @@ where
 			name
 	)
 ;
---92
+--92 --ok, but now remember to include the PAIRS that are more than 10km apart in the next one.
 
 select count(*) from hospitals.dedup1;
 
@@ -169,10 +191,11 @@ from hospitals.test_join_with_contains) as b,
 preselect as c
 where a.name = b.name
 and a.name= c.name
-and c.count > 2
+and c.count > 1
+and c.gid not in (select gid from hospitals.pairs_10k)
 group by a.name, a.gid, a.point, b.centroid
 ;
---490/117
+--490/117/167
 
 drop table hospitals.closest_to_centroid;
 create table hospitals.closest_to_centroid as
@@ -186,7 +209,7 @@ where st_distance in (
 and a.gid not in (
 	select gid from hospitals.pairs_10k
 )
---201/37
+--201/37/62
 
 insert into hospitals.dedup1
 select
@@ -201,7 +224,7 @@ where
 		select gid from hospitals.closest_to_centroid
 	)
 ;
---201/37
+--201/37/62
 
 select count(*) from hospitals.dedup1;
 
@@ -214,13 +237,13 @@ select
 from
 	hospitals.centroids_unmatched_healthzones a
 ;
---234
+--226
 
-select count(*) from hospitals.dedup1; --666/502 GRRR!
+select count(*) from hospitals.dedup1; --666/502/519 GRRR!
 
 
 select * from hospitals.dedup1;
-select count(*) from drc_admin.healthzones; --518
+select count(*) from drc_admin.hz; --518
 
 -- the duplication is because there are some in 'closest to centroid' that are at the same point.
 -- well, that's not true because if we correct for that we get 16 too few ...
@@ -228,6 +251,19 @@ select count(*) from drc_admin.healthzones; --518
 
 select a.* from drc_admin.healthzones_fixed a, hospitals.dedup1 b where st_disjoint(a.wkb_geometry, b.point);
 
+
+create table hospitals.check_match as
+select
+	a.gid,
+	a.wkb_geometry,
+	b.point,
+	a.ZS as a_name,
+	b.name as b_name
+from
+	drc_admin.hz a,
+	hospitals.dedup1 b
+where
+	a.ZS = b.name
 
 
 with preselect as (
