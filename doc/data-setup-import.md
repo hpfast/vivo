@@ -50,6 +50,14 @@ Now you can import into PostgreSQL using ogr2ogr:
 
 	ogr2ogr -f "PostgreSQL" PG:"dbname=geodrc" -nln airports -nlt POINT -lco SCHEMA=drc_admin -lco OVERWRITE=YES airports.vrt
 
+#MAF Airports
+
+We also have a KML file with airports from MAF. This has a different format. First, load kml in qgis and use MMQGIS tools to combine all the airports to one shapefile.
+Problem: ogr2ogr postgresql import truncates the description field at first newline. Couldn't find any solution to this online, so used a macro in vim to delete all these newlines in the kml file, then use mmqgis to combine them.
+Then import this into postgresql with ogr2ogr.
+
+The idea is to add all unique airports from the two layers together. To be able to make this comparison, first we have to standardize the columns. We're going to use
+
 #healthzones
 
 Healthzones come from a shapefile. The geometries are not very good: the polygons don't match up very well. Before importing, I cleaned it up with pprepair:
@@ -163,3 +171,78 @@ Taking the results of our first pass, we will try to select one location from th
 
 #final hospitals table with custom attributes
 
+##nearest airport
+
+It turns out to be a bit of a challenge to merge the two airport tables. Hard to know which one to take as authoritative.
+
+So first I'm just using the airports table (without the MAF airports).
+
+I create a table with the hospital id, the id of the nearest airport, and the distance between them in metres.
+
+	with preselect as (
+		select
+			h.hz_id,
+			(select a.ogc_fid from drc_admin.airports a
+				order by h.point <-> a.wkb_geometry limit 1
+			)
+		from
+			hospitals.hospitals h
+	)
+	select
+		i.hz_id,
+		i.name as h_name,
+		b.name a_name,
+		b.ogc_fid,
+		b.icao,
+		round(st_distance(
+			geography(st_transform(i.point,4326)),
+			geography(st_transform(b.wkb_geometry,4326))
+		)) as distance
+	into
+		hospitals.nearest_airport_without_maf
+	from
+		hospitals.hospitals i,
+		drc_admin.airports b,
+		preselect
+	where
+		i.hz_id = preselect.hz_id
+	and
+		b.ogc_fid = preselect.ogc_fid
+	;--518
+
+Then, we can set the two airport-related columns in the hospitals table.
+
+	--assuming ogc_fid is good ...
+	update hospitals.hospitals
+	set
+		id_nearest_airport = n.ogc_fid
+	from
+		hospitals.nearest_airport_without_maf n
+	where
+		hospitals.hz_id = n.hz_id
+	;--518
+
+	update hospitals.hospitals
+	set
+		dist_nearest_airport = n.distance
+	from
+		hospitals.nearest_airport_without_maf n
+	where
+		hospitals.hz_id = n.hz_id
+	;--518
+
+#create final schema and tables
+
+one schema for export:
+
+* drc
+
+with tables:
+
+* hospitals
+* airports
+* healthzones
+* cities
+* larger_cities (view)
+
+The tables are all indexed.

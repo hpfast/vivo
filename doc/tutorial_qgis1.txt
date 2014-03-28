@@ -1,0 +1,168 @@
+
+
+Exploring with QGIS
+===================
+
+I've been thinking how best to start out with visually exploring the dataset. It turns out QGIS now has some pretty good tools for this in a core plugin.
+
+There should be a 'Database' menu -- from this, select 'DB Manager'. Here you can explore the database tree and open an SQL window to execute arbitrary SQL. From the SQL window you can then load the results as new layers in QGIS. You can also save the queries -- we could use these as input to a function to produce the distance matrices later on. This seems like it gives a good start to your requirements!
+
+Here's a quick tutorial to do some selecting, based on your scenario 2.
+
+Tutorial visualise selected hospitals in petal order
+====================================================
+
+1. create a depot point around which to order things later
+
+execute this in the SQL window:
+
+	create table drc.depot as
+	select
+    st_setsrid(st_makepoint(18.786,-5.027),4326) as point, --makes a new point with given lat/lon in correct projection
+    'depot_kikwit' as name
+    
+Once run, you can load it (either via the sql window interface or through QGIS's normal postgis connector)
+
+You can save the query as something like 'create_depot'.
+
+2. select hospitals that match filter criteria
+
+I'll do this in several steps to demonstrate some different spatial functions and then add them together.
+
+2.1 select healthzones in Bandundu and Kasai Occidental (using prov attributes from healthzone table)
+
+run the following in the SQL window:
+
+	scenario 2 (pseudocode):
+	
+	select a.*, b.wkb_geometry --selects all from hospitals, polygon from healthzones
+	from
+		drc.hospitals a,
+		drc.healthzones b
+	where
+		a.hz_id = b.hz_id
+	and
+		b.provname in ('Kasai Occidental','Bandundu')
+
+save it as 'select_healthzones_Bandundu_Kasai_Oc'.
+Add it to the map using hz_id as unique field and wkb_geometry as geometry field.
+
+2.2 select hospitals in provinces x distance from cities larger than y
+
+First, let's see what cities larger than 100,000 there are in our two provinces:
+
+	--'preselect' gives us the geometries of hz in our provinces
+	-- to use for a spatial comparison
+	with preselect as (
+		select
+			wkb_geometry
+			from
+				drc.healthzones
+			where 
+				provname in ('Bandundu', 'Kasai Occidental')
+		)
+	select
+		c.*
+	from
+		drc.larger_cities c,
+		preselect
+	where
+		population::integer > 100000 --population condition
+	and
+		st_intersects(preselect.wkb_geometry,c.wkb_geometry) --spatial intersect condition
+
+Save as 'find_large_cities' if you want. We apply it to the hospitals as follows:
+
+
+	with preselect as (
+		select
+			st_collect(wkb_geometry) as wkb_geometry --collect the 5 points so we can calculate distance from all of them as one feature
+			from
+				drc.larger_cities
+			where 
+				name in ('Kikwit', 'Kananga', 'Bandundu', 'Tshikapa', 'Ilebo')
+		)
+	select
+		h.name,
+		h.hz_id,
+		h.point,
+		z.provname,
+		row_number() OVER() As fake_id, --qgis was complaining about hz_id, so here's a series to serve as primary key
+		st_distance(
+			geography(st_transform(h.point,4326)),
+			geography(st_transform(c.wkb_geometry,4326))
+			) as distance
+	from
+		drc.hospitals h,
+		preselect c,
+		drc.healthzones z
+	where
+		h.hz_id = z.hz_id
+	and
+		z.provname in ('Bandundu', 'Kasai Occidental')
+	and
+	st_distance(
+			geography(st_transform(h.point,4326)),
+			geography(st_transform(st_closestpoint(c.wkb_geometry,h.point),4326))
+			) >= 100000 --distance is more than 100km
+			--all the extra stuff in st_distance is to get from lat/lon to metres
+
+
+Save this as 'filter_distance_from_cities' and load it on the map with fake_id as primary key and point as geometry column. Note that we're starting to combine things here.
+
+Unfortunately we don't have the roads in the database yet, but the COD_Roads layer has an attribute surface type of which there is one 'paved' -- the road from Kikwit towards Kinshasa. From the above distance query you probably get the idea of how we could include this too.
+
+3. save the results so far
+
+So far everything we've added to the map from our queries has been as a temporary layer -- it will get lost when we close QGIS. You can always save a layer as a shapefile etc by right clicking it and selecting save as. But instead, let's save it as a new table in our database. The DB Manager main window has 4 icons at the top; the third one is 'import layer/file'.
+
+In the dialog enter the following:
+
+* schema: drc
+* table: hospital_distance_filter
+* action: create new table
+* primary key: gid
+* geometry column: point
+* source SRID: 4326
+* target SRID: 4326
+* create spatial index: yes
+
+Once you've uploaded the table, add it via the normal postgis layer addition tool to see if it matches the temporary layer.
+
+4. create a basic radial ordering
+
+As a final demonstration, let's order the selected hospitals radially. In the SQL pane, enter the following:
+
+	select
+		h.*,
+		st_azimuth(h.point,depot.point) as azimuth
+	from
+		drc.hospitals_distance_filter h,
+		drc.depot
+	order by
+		st_azimuth(h.point,depot.point) --just for table output
+
+save as 'radial_ordering' and add to the map.
+
+5. visualise the results
+
+Finally, just to introduce you to the styling interface of QGIS wherein you can make sense of what you see, let's visualise the radial ordering with color.
+
+Right click on the last layer and select 'properties' (or double-click).
+Select the 'style' tab.
+There's a dropdown for the visualisation method -- by default it says 'single symbol'. Select 'Categorized'.
+
+select 'azimuth' as the column to use.
+
+select a color ramp -- e.g. BuGn.
+
+click 'classify' to generate a classification.
+
+Then click 'Ok' to apply and close.
+
+You see the color ramp has been applied in clockwise direction around the depot.
+
+Maybe save the radial ordering as a shapefile for good measure :)
+
+
+
