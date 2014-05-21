@@ -1,0 +1,6 @@
+param is 
+
+['dist_city']
+Connecting to database
+    ->host='localhost' port='5438' dbname='geodrc' user='hans' password=''
+connection successful
