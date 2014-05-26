@@ -20,6 +20,7 @@ import psycopg2	#connect to postgresql databases
 import ppygis	#use postgis-specific types and convert them to python types
 from shapely.wkb import dumps, loads	#manipulate geometries in python
 from shapely.geometry import shape
+from binascii import a2b_hex, b2a_hex
 import geojson	#do geojson stuff
 import pprint
 
@@ -32,12 +33,13 @@ def main():
 	#get the query parameters from invocation arguments
 	args = sys.argv[1:]
 	params = argsparse(args)
-	for param in params:
-		print "param is \n"
-		print param
+	if params:
+		for param in params:
+			print "param is \n"
+			print param
 
 	#build postgresql connection string
-	conn_string = "host='localhost' port='5438' dbname='geodrc' user='hans' password=''"
+	conn_string = "host='localhost' port='5432' dbname='geodrc' user='hans' password=''"
 	#print the connection string we will use to connect
 	print "Connecting to database\n    ->%s" % (conn_string)
 	
@@ -57,35 +59,38 @@ def main():
 		
 		#max two parameters. First if there's only one, parse as follows:
 		
-		if len(params) == 1:
-			qWhereClause = "WHERE " + build_conditional(params[0])
-				
-		#else if there's two, join them with AND
-		else:
-			conditions = []
-			conditions.append(build_conditional(params[0]))
-			conditions.append(build_conditional(params[1]))
-			qWhereClause = "WHERE " + " AND ".join(conditions)
+		if params:
+			if len(params) == 1:
+				qWhereClause = "WHERE " + build_conditional(params[0])
+					
+			#else if there's two, join them with AND
+			elif len(params) == 2:
+				conditions = []
+				conditions.append(build_conditional(params[0]))
+				conditions.append(build_conditional(params[1]))
+				qWhereClause = "WHERE " + " AND ".join(conditions)
+			elif len(params) == 0:
+				qWhereClause = ""
 		
 		print qWhereClause
 		
 		#FROM clause hardcoded
 		qTempTableFromClause = " FROM (SELECT st_collect(wkb_geometry) wkb_geometry FROM drc.larger_cities) as larger_cities, drc.hospitals "
-		qTempSelect = "SELECT h.hz_id, h.point, h.name FROM drc.hospitals h, drc.larger_cities c"
+		qTempSelect = " hospitals.hz_id FROM hospitals.hospitals , drc.larger_cities  "
 		
 		# a select clause for a voronoi function
-		qSelect = "SELECT st_asgeojson(point) FROM voronoi('drc.hosp_select','point') AS (hz_id integer, point geometry) WHERE hz_id in (SELECT hospitals.hz_id" + qFromClause + qWhereClause + ")"
+		qSelect = "SELECT * FROM voronoi('hospitals.hospitals', 'point') AS (id integer, point geometry) WHERE id in (SELECT "+ qTempSelect + qWhereClause + ")"
 		
 		
 		print "Running voronoi on ..."
-		print qTempSelect
+		print qSelect
 		
 		
 		# 2. execute database queries
 		
 		#execute the queries
-		cursor.execute(qTempSelect)
-		cursor.execute(qVoronoi)
+		#cursor.execute(qTempSelect)
+		cursor.execute(qSelect)
 		
 		#fetch the query results
 		voronois = cursor.fetchall()
@@ -98,48 +103,55 @@ def main():
 		print "disconnection successful"
 		col = []
 		#convert the well-known-binary geometry representations to python data types
-		for geom in voronois:
-			u = ''.join(geom)
-		
-			#v = ppygis.Geometry.read_ewkb(geom)
-			#print v
-			#print geom
-			#print geom.read_ewkb()
-			w = geojson.loads(u)
+		for record in voronois: #obj is a tuple with attributes from postgresql table
+			#u = ''.join(geom[1])
+			#print u
+			#v = ppygis.Geometry.read_ewkb(geom[1])
+			#print geom[0]
+			#w = geojson.Polygon(v)
+			#print " ", geom[0]
+			#print u.read_ewkb()
+			
+			#w = geojson.loads(geom[1])
+			##print w
+			#var = geojson.dumps(v)
+			#print var
 			#print w
-			#var = dumps(v)
-			print w
-			r = shape(w) #r is a shapely object
-			print r
-			#s = loads(str(geom)) this should also be a way to get shapely, but doesn't work.
+			#r = shape(u) #r is a shapely object
+			#print r
+			
+			s = loads(a2b_hex(record[1])) #postgis uses hex encoding, need to account for this
+			print s, record[0]
 			feature = geojson.Feature(
-				geometry=w,
+				geometry=s,
 				properties={
-					"name":"null"
+					"id": record[0]
 						}
 			)
 			col.append(feature)
 		
 		collection = geojson.dumps(geojson.FeatureCollection(col))	
-			
+		
+		#below is an alternative method to pass through the geojson if we use the postgis st_asgeojson() to request our geometries in geojson format already: just concat them together with the geojson fluff manually.	
 			# output is the main content, rowOutput is the content from each record returned
-		output = ""
-		rowOutput = ""
-		count = 0
-		for geom in voronois:
-			count += 1
-			gom = str(geom)
+		#output = ""
+		#rowOutput = ""
+		#count = 0
+		#for geom in voronois:
+			#print geom
+			#count += 1
+			#gom = (geom[0])
 			#print gom
-			oput = '{"type": "Feature", "properties": {"name": "duh"}, "geometry": ' + ''.join(geom) + '}'
-			output += oput+',' 
+			#oput = '{"type": "Feature", "properties": {"id": "'+str(geom[1])+'"}, "geometry": ' + ''.join(gom) + '}'
+			#output += oput+',' 
 		#print output
-		# Assemble the GeoJSON
-		totalOutput = '{ "type": "FeatureCollection", "features": [ ' + output + ' ]}'
+		### Assemble the GeoJSON
+		#totalOutput = '{ "type": "FeatureCollection", "features": [ ' + output + ' ]}'
 			
 		with open('/home/hans/priv/vivo/file.geojson', 'w') as outfile:
 			#outfile.write(totalOutput)
 			outfile.write(collection)
-		print "wrote "+str(count)+" features"
+		#print "wrote "+str(count)+" features"
 	except:
 		# Get the most recent exception
 		exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
@@ -179,15 +191,9 @@ def argsparse(args):
 			except:
 				print "parameter input was invalid, should be param_name=param_value"
 	else:
-		sys.exit("need some filter params, voronoi of all of Congo would take too long")
-
+		#sys.exit("need some filter params, voronoi of all of Congo would take too long")
+		return
 	return params
-
-
-
-
-
-
 
 
 
