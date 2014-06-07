@@ -17,12 +17,13 @@ geojson
 
 import sys
 import psycopg2	#connect to postgresql databases
-import ppygis	#use postgis-specific types and convert them to python types (not used at the moment)
+import ppygis	#use postgis-specific types and convert them to python types
 from shapely.wkb import dumps, loads	#manipulate geometries in python
-from shapely.geometry import shape #not used net
-from binascii import a2b_hex, b2a_hex #need this to deal with encoding differences between postgis/shapely
+from shapely.geometry import shape
+from binascii import a2b_hex, b2a_hex
 import geojson	#do geojson stuff
-import pprint #not used yet
+import pprint
+
 
 def main():
 	"""
@@ -78,9 +79,8 @@ def main():
 		qTempSelect = " hospitals.hz_id FROM hospitals.hospitals , drc.larger_cities  "
 		
 		# a select clause for a voronoi function
-		qSelect = "SELECT * FROM voronoi_p3cmp('hospitals.hospitals', 'point') AS (id integer, point geometry) WHERE id in (SELECT "+ qTempSelect + qWhereClause + ")"
+		qSelect = "SELECT * FROM voronoi('hospitals.hospitals', 'point') AS (id integer, point geometry) WHERE id in (SELECT "+ qTempSelect + qWhereClause + ")"
 		
-		qPreSelect = "select point from hospitals.hospitals"
 		
 		print "Running voronoi on ..."
 		print qSelect
@@ -90,8 +90,8 @@ def main():
 		
 		#execute the queries
 		#cursor.execute(qTempSelect)
-		#cursor.execute(qSelect)
-		cursor.execute(qPreSelect)
+		cursor.execute(qSelect)
+		
 		#fetch the query results
 		voronois = cursor.fetchall()
 		
@@ -102,44 +102,35 @@ def main():
 		conn.close()
 		print "disconnection successful"
 		col = []
-		
-		#using internal voronoi
-		for record in voronois:
-			geom = loads(a2b_hex(record[0]))
-			col.append(geom)
-			
-		vor = computeVoronoiDiagram(col)
-		for v in vor:
-			print v[1], v[2]
 		#convert the well-known-binary geometry representations to python data types
-		#for record in voronois: #obj is a tuple with attributes from postgresql table
-			##u = ''.join(geom[1])
-			##print u
-			##v = ppygis.Geometry.read_ewkb(geom[1])
-			##print geom[0]
-			##w = geojson.Polygon(v)
-			##print " ", geom[0]
-			##print u.read_ewkb()
+		for record in voronois: #obj is a tuple with attributes from postgresql table
+			#u = ''.join(geom[1])
+			#print u
+			#v = ppygis.Geometry.read_ewkb(geom[1])
+			#print geom[0]
+			#w = geojson.Polygon(v)
+			#print " ", geom[0]
+			#print u.read_ewkb()
 			
-			##w = geojson.loads(geom[1])
-			###print w
-			##var = geojson.dumps(v)
-			##print var
+			#w = geojson.loads(geom[1])
 			##print w
-			##r = shape(u) #r is a shapely object
-			##print r
+			#var = geojson.dumps(v)
+			#print var
+			#print w
+			#r = shape(u) #r is a shapely object
+			#print r
 			
-			#s = loads(a2b_hex(record[1])) #postgis uses hex encoding, need to account for this
-			#print s, record[0]
-			#feature = geojson.Feature(
-				#geometry=s,
-				#properties={
-					#"id": record[0]
-						#}
-			#)
-			#col.append(feature)
+			s = loads(a2b_hex(record[1])) #postgis uses hex encoding, need to account for this
+			print s, record[0]
+			feature = geojson.Feature(
+				geometry=s,
+				properties={
+					"id": record[0]
+						}
+			)
+			col.append(feature)
 		
-		#collection = geojson.dumps(geojson.FeatureCollection(col))	
+		collection = geojson.dumps(geojson.FeatureCollection(col))	
 		
 		#below is an alternative method to pass through the geojson if we use the postgis st_asgeojson() to request our geometries in geojson format already: just concat them together with the geojson fluff manually.	
 			# output is the main content, rowOutput is the content from each record returned
@@ -157,9 +148,9 @@ def main():
 		### Assemble the GeoJSON
 		#totalOutput = '{ "type": "FeatureCollection", "features": [ ' + output + ' ]}'
 			
-		#with open('/home/hans/priv/vivo/file.geojson', 'w') as outfile:
-			##outfile.write(totalOutput)
-			#outfile.write(collection)
+		with open('/home/hans/priv/vivo/file.geojson', 'w') as outfile:
+			#outfile.write(totalOutput)
+			outfile.write(collection)
 		#print "wrote "+str(count)+" features"
 	except:
 		# Get the most recent exception
