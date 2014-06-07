@@ -77,14 +77,25 @@ def main():
         sel = cursor.fetchall()
         print sel
         
-        
+        #update hosps dict with name and geometry
+        for f in sel:
+            for h in hosps:
+                if f[1] == h:
+                    hosps[h].update({'name':f[0],'geom':f[2]})
+        print hosps
     except:
         # Get the most recent exception
         exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
         # Exit the script and print an error telling what happened.
-        sys.exit("Database connection failed!\n ->%s" % (exceptionValue))
+        sys.exit("error\n ->%s" % (exceptionValue))
 
     #draw lines between consecutive pairs of points using shapely.
+    #import geometries into python
+    for h in hosps:
+        g = loads(a2b_hex(hosps[h]['geom'])) #postgis uses hex encoding, need to account for this
+        print g
+        hosps[h]['geom'] = g
+    print hosps
 
     #merge geometries and features
 
