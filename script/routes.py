@@ -93,9 +93,8 @@ def main():
     #import geometries into python
     for h in hosps:
         g = loads(a2b_hex(hosps[h]['geom'])) #postgis uses hex encoding, need to account for this
-        print g
         hosps[h]['geom'] = g
-    print hosps
+    print hosps #now has shapely objects instead of well-known binary strings from postgis
 
     #merge geometries and features
 
