@@ -1,2 +1,4 @@
 *.geany
-script/file.geojson
+*.geojson
+*.pyc
+script/userconfig.py
