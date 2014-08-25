@@ -136,7 +136,7 @@ def main():
                     'line_id':l
                     #uses shapely LineString constructor with x,y coords of start and end points
                 })
-         i++;       
+        i+=1;       
                 
     # ------------            
     # GEOJSONIFY
@@ -157,9 +157,8 @@ def main():
     #make all features into a featurecollection
     collection = geojson.FeatureCollection(col)
     
-    #these features have no intrinsic order. You could maintain order by
-    #using an iterator for the keys in lines instead of start/end ids.
-    
+    #order is in order_id key.
+ 
     #write featurecollection to file
     with open('/home/hans/priv/vivo/script/lines.geojson', 'w') as outfile:
         outfile.write(geojson.dumps(collection))
