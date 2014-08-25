@@ -115,6 +115,7 @@ def main():
     #add geometry and properties to lines dict
     #loop over every consecutive pair from input points
     #we can thus add attrs of both points, and create a line between them.
+    i = 1
     for first, second in grouper(hospar, 2):
         for l in lines:
             if l == str(first)+"_"+str(second):
@@ -129,11 +130,13 @@ def main():
                     'start_name': hosps[first]['name'],
                     'end_id':second,
                     'end_name':hosps[second]['name'],
+                    'order_id': i,
                     #here comes the new linestring geometry
-                    'geom':LineString([(x1,y1),(x2,y2)]),'line_id':l
+                    'geom':LineString([(x1,y1),(x2,y2)]),
+                    'line_id':l
                     #uses shapely LineString constructor with x,y coords of start and end points
                 })
-                
+         i++;       
                 
     # ------------            
     # GEOJSONIFY
