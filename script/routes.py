@@ -94,6 +94,7 @@ def main():
             for h in hosps:
                 if f[1] == h: #we match on hz_id
                     hosps[h].update({'name':f[0],'geom':f[2]}) #geom is still well-known binary format here
+                    print hosps[h]
     except:
         # Get the most recent exception
         exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
@@ -159,12 +160,16 @@ def main():
     
     #make all features into a featurecollection
     collection = geojson.FeatureCollection(col)
+    print "HERE COMES THE COLLECTION"
+    print geojson.dumps(collection)
     
     #order is in order_id key.
  
     #write featurecollection to file
-    with open(os.path.normpath(config['output_path']) + 'lines.geojson', 'w') as outfile:
+    print os.path.normpath(config['output_path'])+'lines.geojson'
+    with open(os.path.normpath(config['output_path']) + '/lines.geojson', 'w') as outfile:
         outfile.write(geojson.dumps(collection))
+    outfile.close()
     print "wrote features\n"
     
     
