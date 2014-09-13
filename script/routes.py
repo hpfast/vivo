@@ -23,7 +23,7 @@ psycopg2
 shapely
 geojson
 """
-
+import os
 import sys
 import psycopg2	#connect to postgresql databases
 #import ppygis	#use postgis-specific types and convert them to python types
@@ -32,7 +32,7 @@ from shapely.geometry import shape, LineString #create new geometries
 from binascii import a2b_hex, b2a_hex #convert wkb geometries
 import geojson	#do geojson stuff
 import pprint
-
+from userconfig import *
 
 def main():
     """
@@ -70,13 +70,13 @@ def main():
     #fetch hospital records from database and update hosps dict with name, geometry.
 
     #build postgresql connection string
-    conn_string = "host='localhost' port='5432' dbname='geodrc' user='hans' password=''"
+    #conn_string = "host='gis' port='5432' dbname='postgres' user='postgres' password=''"
     #print the connection string we will use to connect
-    print "Connecting to database\n    ->%s" % (conn_string)
+    print "Connecting to database\n    ->%s" % (config['conn_string'])
 
     try:
         # get a connection, if a connect cannot be made an exception will be raised here
-        conn = psycopg2.connect(conn_string)
+        conn = psycopg2.connect(config['conn_string'])
 
         # conn.cursor will return a cursor object, you can use this cursor to perform queries
         cursor = conn.cursor()
@@ -115,6 +115,7 @@ def main():
     #add geometry and properties to lines dict
     #loop over every consecutive pair from input points
     #we can thus add attrs of both points, and create a line between them.
+    i = 1
     for first, second in grouper(hospar, 2):
         for l in lines:
             if l == str(first)+"_"+str(second):
@@ -129,12 +130,17 @@ def main():
                     'start_name': hosps[first]['name'],
                     'end_id':second,
                     'end_name':hosps[second]['name'],
+                    'order_id': i,
                     #here comes the new linestring geometry
-                    'geom':LineString([(x1,y1),(x2,y2)]),'line_id':l
+                    'geom':LineString([(x1,y1),(x2,y2)]),
+                    'line_id':l
                     #uses shapely LineString constructor with x,y coords of start and end points
+
+                    # JBC: thought the following might work to add errors, but it couldn't serialize the output 
+                    # 'geom':pylab.arrow(x1, y1, x2, y2, color='#999999', aa=True, head_width=1.0, head_length=1.0),
                 })
-                
-                
+        i+=1;       
+                 
     # ------------            
     # GEOJSONIFY
     # ------------
@@ -154,11 +160,10 @@ def main():
     #make all features into a featurecollection
     collection = geojson.FeatureCollection(col)
     
-    #these features have no intrinsic order. You could maintain order by
-    #using an iterator for the keys in lines instead of start/end ids.
-    
+    #order is in order_id key.
+ 
     #write featurecollection to file
-    with open('/home/hans/priv/vivo/script/lines.geojson', 'w') as outfile:
+    with open(os.path.normpath(config['output_path']) + 'lines.geojson', 'w') as outfile:
         outfile.write(geojson.dumps(collection))
     print "wrote features\n"
     

@@ -14,7 +14,7 @@ psycopg2
 (shapely)
 geojson
 """
-
+import os
 import sys
 import psycopg2	#connect to postgresql databases
 import ppygis	#use postgis-specific types and convert them to python types
@@ -23,7 +23,7 @@ from shapely.geometry import shape
 from binascii import a2b_hex, b2a_hex
 import geojson	#do geojson stuff
 import pprint
-
+from userconfig import *
 
 def main():
 	"""
@@ -39,13 +39,13 @@ def main():
 			print param
 
 	#build postgresql connection string
-	conn_string = "host='localhost' port='5432' dbname='geodrc' user='hans' password=''"
+    #conn_string = "host='gis' port='5432' dbname='postgres' user='postgres' password=''"
 	#print the connection string we will use to connect
-	print "Connecting to database\n    ->%s" % (conn_string)
+	print "Connecting to database\n    ->%s" % (config['conn_string'])
 	
 	try:
 		# get a connection, if a connect cannot be made an exception will be raised here
-		conn = psycopg2.connect(conn_string)
+		conn = psycopg2.connect(config['conn_string'])
 
 		# conn.cursor will return a cursor object, you can use this cursor to perform queries
 		cursor = conn.cursor()
@@ -76,10 +76,10 @@ def main():
 		
 		#FROM clause hardcoded
 		qTempTableFromClause = " FROM (SELECT st_collect(wkb_geometry) wkb_geometry FROM drc.larger_cities) as larger_cities, drc.hospitals "
-		qTempSelect = " hospitals.hz_id FROM hospitals.hospitals , drc.larger_cities  "
+		qTempSelect = " hospitals.hz_id FROM drc.hospitals , drc.larger_cities  "
 		
 		# a select clause for a voronoi function
-		qSelect = "SELECT * FROM voronoi('hospitals.hospitals', 'point') AS (id integer, point geometry) WHERE id in (SELECT "+ qTempSelect + qWhereClause + ")"
+		qSelect = "SELECT * FROM voronoi('drc.hospitals', 'point') AS (id integer, point geometry) WHERE id in (SELECT "+ qTempSelect + qWhereClause + ")"
 		
 		
 		print "Running voronoi on ..."
@@ -121,7 +121,7 @@ def main():
 			#print r
 			
 			s = loads(a2b_hex(record[1])) #postgis uses hex encoding, need to account for this
-			print s, record[0]
+			#print s, record[0]
 			feature = geojson.Feature(
 				geometry=s,
 				properties={
@@ -148,7 +148,7 @@ def main():
 		### Assemble the GeoJSON
 		#totalOutput = '{ "type": "FeatureCollection", "features": [ ' + output + ' ]}'
 			
-		with open('/home/hans/priv/vivo/file.geojson', 'w') as outfile:
+		with open(os.path.normpath(config['output_path']) + 'file.geojson', 'w') as outfile:
 			#outfile.write(totalOutput)
 			outfile.write(collection)
 		#print "wrote "+str(count)+" features"
