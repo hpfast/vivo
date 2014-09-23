@@ -47,21 +47,31 @@ def main():
     # IMPORT LIST OF HOSPITALS
     # ------------------------
     
-    #get hospital IDs from list file, create dict
-    #we'll also need a string and an array for iteration
-    hospstring = ''
-    hospar = []
-    hosps = {}
+    #The main datastructure is an array representing all the rountes.
+    # Each route is a dict with key = hospID and value empty ready to hold geometries.
+    routes = [] 
+    #hosps = {}
+    print sys.argv[1]
     try:
         arg = sys.argv[1]
         input_file = open(arg, 'r')
-        line = input_file.readline()
-        line = line.rstrip()
-        hospstring = line #we'll need this later outside this scope
-        ls = line.split(' ')
-        ls = [int(i) for i in ls]
-        hospar = ls
-        hosps = dict((l,{}) for l in ls) #convert list to dict
+        inputline = input_file.readline()
+        while inputline:
+        #for inputline in input_file.readline():
+            print inputline
+            line = inputline.rstrip()
+            #route[i] = l #we'll need this later outside this scope
+            ls = line.split(' ')
+            ls = [int(i) for i in ls]
+            hospar = ls
+            hosps = dict((l,{}) for l in ls) #convert list to dict
+            routes.append(hosps) #put the dict of hospitals into the array of routes
+            inputline = input_file.readline()
+        print routes
+        input_file.close()
     except:
         exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
         sys.exit('error reading from input file. Does it exist?'+str(exceptionValue)+str(exceptionTraceback))
+
+if __name__ == "__main__":
+    sys.exit(main())
