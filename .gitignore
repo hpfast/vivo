@@ -2,3 +2,6 @@
 *.geojson
 *.pyc
 script/userconfig.py
+
+script/.multiroutes.py.swp
+script/.routes.py.swp

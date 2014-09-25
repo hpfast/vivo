@@ -1,0 +1,22 @@
+making feature collections
+
+
+question 1: do we give the script both a single route and a multiroute mode?
+
+
+
+
+def createRouteLegs():
+    """
+    create single lineStrings between two points
+    """
+
+#execute if in multi-mode    
+def joinLegsIntoRouteGeoms():
+    """
+    join individual legs into a linestring representing a whole route
+    """
+    
+
+
+#output is a featureCollection: the print function doesn't care.
