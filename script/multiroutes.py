@@ -3,8 +3,7 @@
 """
 SUMMARY
 
-Given ordered list of hospital IDs as input, returns their point geometries with their route order as label and routes between them as linestrings (in GeoJSON geometrycollection).
-This version takes multiple ordered lists representing different routes, and combines these into separate multilinestrings within a single featurecollection representing all the routes.
+Given lists of hospital IDs representing routes, This script produces a GeoJSON featurecollection representing all the routes.
 
 USAGE
 
@@ -18,7 +17,7 @@ where listfile is a plain text file with each line representing one route, conta
     133 25 28 100 121 131 133
     34 12 99 100 22 13 34
     
-Writes a single file multiroutes.geojson.
+Writes a single file as specified in the config file 'userconfig.py'.
 
 DEPENDENCIES
 
@@ -131,57 +130,10 @@ def main():
     #order is in order_id key.
  
     #write featurecollection to file
-    print os.path.normpath(config['output_path'])+'lines.geojson'
     with open(os.path.normpath(config['output_path']) + '/lines.geojson', 'w') as outfile:
         outfile.write(geojson.dumps(collection))
     outfile.close()
     print "wrote features to "+os.path.normpath(config['output_path'])+"lines.geojson"
-    # -------------------------------------
-    # DRAW LINES BETWEEN POINTS
-    # -------------------------------------
-    #convert geometries in hosps to shapely objects (from well-known-binary format received from postgis)
-#    for route in routes:
-#        line = []
-#        for h in route:
-#            route[h]['geom'] = loads(a2b_hex(route[h]['geom'])) #postgis uses hex encoding, need to account for this
-#            line.append(dict((str(first)+"_"+str(second),{}) for first,second in grouper(list(route), 2)))
-    #TODO: modify the following to create an array of key, multilinestring. In two steps? first create a multilinestring for each route, then
-    #line can be as below
-    #multiline the joined lines for each route
-    #lines the container to hold them all.
-        #create a new dict to hold our line features
-        #initially contains key and empty dict as value
-        
-        #add geometry and properties to lines dict
-        #loop over every consecutive pair from input points
-        #we can thus add attrs of both points, and create a line between them.
-#        i = 1
-        #for first, second in grouper(list(route), 2):
-           # print "first is "+str(first) +", second is "+str(second)
-        #    for l in line:
-               # if l == str(first)+"_"+str(second):
-#                    print "hello!!!!!!!!!!!!!"
-                    #get x and y coords from shapely point objects   
-               #     x1 = route[first]['geom'].x
-               #     y1 = route[first]['geom'].y
-               #     x2 = route[second]['geom'].x
-               #     y2 = route[second]['geom'].y
-                    #create an item in lines with id and name of start/end hosps, and linestring geometry
-               #     line[l].update({
-               #         'start_id':first,
-               #         'start_name': hosps[first]['name'],
-               #         'end_id':second,
-               #         'end_name':hosps[second]['name'],
-               #         'order_id': i,
-               #         #here comes the new linestring geometry
-               #         'geom':LineString([(x1,y1),(x2,y2)]),
-               #         'line_id':l
-                        #uses shapely LineString constructor with x,y coords of start and end points
-
-                        # JBC: thought the following might work to add errors, but it couldn't serialize the output 
-                        # 'geom':pylab.arrow(x1, y1, x2, y2, color='#999999', aa=True, head_width=1.0, head_length=1.0),
-               #     })
-           # i+=1;       
 
     #end main
 
@@ -192,10 +144,6 @@ def db_fetch(cursor, route):
     db_matches = cursor.fetchall()
     return db_matches
 
-#helper function from stackoverflow to iterate consecutive pairs
-def grouper(input_list, n = 2):
-    for i in xrange(len(input_list) - (n - 1)):
-        yield input_list[i:i+n]
         
 if __name__ == "__main__":
     sys.exit(main())
