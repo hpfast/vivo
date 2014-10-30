@@ -28,8 +28,9 @@ app.Map = function (num) {
     
 };
 
-app.mapBuilder = function (event, num) {
-    for (var i = 0; i<num;i++){
+//wrapper function calls app.Map constructor on 'datafetched' event
+app.mapBuilder = function (event, ch) {
+    for (var i = 0; i<ch.length;i++){
         app.maps.push(new app.Map(i+1));
     }   
     
@@ -44,13 +45,20 @@ $(document).ready(function ($) {
     
     $(app).on('datafetched',app.mapBuilder)
     
+    var request = {"sql":""};
+    
+    //TODO: instead of seed.json, query the database.
     $.ajax({
+        //type: 'POST',
         type: 'GET',
-        url: 'data/seed.json',
+        //url: 'data/seed.json',
+        url: 'http://192.168.122.116:3000/db/postgres/schemas/public/tables/',
+        //data: request,
         dataType: 'json'
     }).done(function(data,statusText,jqXHR){
-        $(app).trigger('datafetched',data.num)
-        
+        console.log('do we get this far?');
+        console.log(data);
+        $(app).trigger('datafetched',data.children);
         
     }).fail(function(data,statusText,jqXHR){
         console.log(statusText,jqXHR);
