@@ -1,8 +1,5 @@
-{
-"type": "FeatureCollection",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
-                                                                                
-"features": [
+{"type": "FeatureCollection",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } }, "features": [
 { "type": "Feature", "properties": { "gid": 194, "name": "Kapanga", "affiliation": null, "id_nearest_airport": 194, "dist_nearest_airport": 36, "certainty": "pair10km", "lvlid": "CDH006033000000000000", "source": "Zones de sante - obtained from MOH DRC Arretes Ministeriels 2003", "provname": "Katanga", "name_api": "Kapanga", "partenaire": "A", "gavi": "D", "hz_id": 193, "type": null }, "geometry": { "type": "Point", "coordinates": [ 22.58333, -8.35 ] } },
 { "type": "Feature", "properties": { "gid": 197, "name": "Karisimbi", "affiliation": null, "id_nearest_airport": 28, "dist_nearest_airport": 6247, "certainty": "centroid", "lvlid": "CDH011030000000000000", "source": "Zones de sante - obtained from MOH DRC Arretes Ministeriels 2003", "provname": "Nord Kivu", "name_api": "Karisimbi", "partenaire": "A", "gavi": "D", "hz_id": 196, "type": null }, "geometry": { "type": "Point", "coordinates": [ 29.206825174932842, -1.634053931887601 ] } },
 { "type": "Feature", "properties": { "gid": 424, "name": "Nyiragongo", "affiliation": null, "id_nearest_airport": 28, "dist_nearest_airport": 16281, "certainty": "centroid", "lvlid": "CDH009032000000000000", "source": "Zones de sante - obtained from MOH DRC Arretes Ministeriels 2003", "provname": "Nord Kivu", "name_api": null, "partenaire": "A", "gavi": "D", "hz_id": 424, "type": null }, "geometry": { "type": "Point", "coordinates": [ 29.253650861349403, -1.533449007470839 ] } },
