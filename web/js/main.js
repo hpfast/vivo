@@ -29,8 +29,8 @@ app.Map = function (num) {
 };
 
 //wrapper function calls app.Map constructor on 'datafetched' event
-app.mapBuilder = function (event, ch) {
-    for (var i = 0; i<ch.length;i++){
+app.mapBuilder = function (event, data) {
+    for (var i = 0; i<data.d.length;i++){
         app.maps.push(new app.Map(i+1));
     }   
     
@@ -52,13 +52,14 @@ $(document).ready(function ($) {
         //type: 'POST',
         type: 'GET',
         //url: 'data/seed.json',
-        url: 'http://192.168.122.116:3000/db/postgres/schemas/public/tables/',
+       url:'http://128.199.53.137:8080/routes/10',
+        // url: 'http://192.168.122.116:3000/db/postgres/schemas/public/tables/',
         //data: request,
         dataType: 'json'
     }).done(function(data,statusText,jqXHR){
         console.log('do we get this far?');
         console.log(data);
-        $(app).trigger('datafetched',data.children);
+        $(app).trigger('datafetched',{d:data});
         
     }).fail(function(data,statusText,jqXHR){
         console.log(statusText,jqXHR);
