@@ -15,9 +15,19 @@ clone the repository: `git clone https://github/com/hpfast/vivo`
 
 `server` (TODO) contains a script to connect to your processing outputs. Currently it handles custom queries to a postgresql database. You could add more scripts for other kinds of backends, or replace this component entirely with any other backend.
 
-For the server backend you can choose from:
+For the server backend we've explored two options:
 
+* nginx with ngx_postgres (provided by openresty)
 * postgresql-http-server (nodejs)
+
+With the Nginx approach, you build an API to which you can connect RESTfully. The postgresql-http-server allows/requires you to define your SQL fully in your client requests.
+
+
+##nginx with ngx_postgres
+
+This is our choice for now.
+
+[openresty](http://openresty.org) makes nginx into a web application server. We can create a RESTful API to PostgreSQL with nginx configuration directives, using the ngx_postgres upstream connector. So the nginx configuration file is actually part of our application. I put it in `server/nginx/conf/` and symlink it to my openresty configuration location on the server -- you could also run openresty's nginx pointing to the conf file in this repo. See [these instructions](doc/setup_openresty.md) for installing openresty on Ubuntu 14.04.
 
 ##postgresql-http-server (nodejs)
 
