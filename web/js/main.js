@@ -85,7 +85,7 @@ app.drawRoutes = function(event, data){
     var route = results[0]; //just one for now
     
     //we need to draw the polylines and draw the points separately
-    
+    //TODO: group by solution, month etc
     var latlngs = [];
     for (var i in route){
         var c = app.getCoords(app.geodata.hospitals.features,route[i]);
@@ -96,19 +96,60 @@ app.drawRoutes = function(event, data){
 
 }
 
+//viewer should handle all different kinds of API requests.
+//decide which filter routines to call, end by triggering 'routesfiltered' with the data
+app.filterRoutes = function(event, data){
+    //check location string?
+    // ...
+    var data_filtered;
+    if (data.r == 'byrun'){
+        data_filtered = app.groupBySolution(null, data);
+    }else{
+        console.log('only testing byrun for now');
+    }
+    
+    $(app).trigger('routesfiltered', data_filtered);
+}
+
+
+//should group by run, solution, and month.
+app.groupBySolution = function(event, data){
+    var data_by_solution = data;
+    //var data_by_solution = [];
+//    for (var i in data.d){
+//    //var data_by_month = app.groupByMonth(data);
+//        var data_by_month = [];
+//        data_by_solution.push(data.d[i]);
+//    }
+    return(data_by_solution);
+    
+    
+    
+}
+
+//TODO: we need to group by month, count how many months there are, and draw that many maps,
+//keeping track of map ids to put
+app.groupByMonth = function(event, data){
+    
+    
+}
+
 app.dataFetcher = function(){
     $.ajax({
         //type: 'POST',
         type: 'GET',
         //url: 'data/seed.json',
        //url:'http://128.199.53.137:8080/routes/byid/1',
-        url:'http://128.199.53.137:8080/routes/bysolution/25',
+        //TODO: get url from location bar or user input on page
+        url:'http://128.199.53.137:8080/routes/byrun/latest',
         // url: 'http://192.168.122.116:3000/db/postgres/schemas/public/tables/',
         //data: request,
         dataType: 'json'
     }).done(function(data,statusText,jqXHR){
         app.data=data;
-        $(app).trigger('datafetched',{d:data});
+        
+        //pass on data and request endpoint
+        $(app).trigger('datafetched',{d:data,r:this.url.match('/routes/(.*)/')[1]});
         
     }).fail(function(data,statusText,jqXHR){
         console.log(statusText,jqXHR);
@@ -121,7 +162,11 @@ app.dataFetcher = function(){
 $(document).ready(function ($) {
     
     //$(app).on('geodataparsed',app.addGeodata); //demo function: to test if the geojson works
-    $(app).on('datafetched',app.mapBuilder);
+    
+    //TODO: before calling mapbuilder, run the grouping routines to end up with routes grouped by month.
+    $(app).on('datafetched',app.filterRoutes); //produces 'routesfiltered'
+    $(app).on('routesfiltered',app.mapBuilder);
+    //$(app).on('datafetched',app.mapBuilder);
     $(app).on('geodatafetched',function(event,data){
         app.geodata.hospitals = JSON.parse(data);
         $(app).trigger('geodataparsed');
@@ -141,7 +186,7 @@ $(document).ready(function ($) {
         $(app).trigger('geodatafetched',data)
     });
 
-    //add attribution
+    //add attribution for background map data
     $(app).on('mapsadded', function(){
         $('#map-container').append($('<p style="float:left; font-size:12px">').html('Powered by <a href="http://leafletjs.com">Leaflet</a> -- Tiles Courtesy of <a href="http://www.mapquest.com/">MapQuest</a> &mdash; Map data &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'));
     });
