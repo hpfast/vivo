@@ -1,17 +1,15 @@
 var app = app || {};
 
 //constructor to create a pane with Leaflet map and proper data bindings
-app.Map = function (num) {
+app.Map = function (num, sol_id) { //temporary solution: distinguish with solution id.
     var time = new Date();
     var num = num;
-    this.name = function(){
-        return(num)
-    };
+    this.sol_id = sol_id;
     this.whattime = function(){
         return(time)
     };
-    $('#map-container').append($('<div id="map'+num+'-box" class="map-box"><div id="map'+num+'" class="map"></div>'));
-    this.map = new L.Map('map'+num, {zoomControl: false, attributionControl: false}).setView([-5.07, 18.79], 6);
+    $('#map-container').append($('<div id="'+sol_id+'-map'+num+'-box" class="map-box"><div id="'+sol_id+'map'+num+'" class="map"></div>'));
+    this.map = new L.Map(sol_id+'map'+num, {zoomControl: false, attributionControl: false}).setView([-5.07, 18.79], 6);
     //big block of stuff for displaying and attributing background map
     var mapQuestAttr = 'Tiles Courtesy of <a href="http://www.mapquest.com/">MapQuest</a> &mdash; ';
     var osmDataAttr = 'Map data &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
@@ -22,19 +20,37 @@ app.Map = function (num) {
     var osm = L.tileLayer("http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:osmDataAttr});
     var mq=L.tileLayer(mopt.url,mopt.options);
     mq.addTo(this.map);
-    $('#map'+num).before($('<h2>Map '+num+'</h2>'));
+    $('#'+sol_id+'map'+num).before($('<h2>Map '+num+'</h2>'));
 
     
     
 };
 
+app.solutionBuilder = function(event, data){
+    for (var i in data){
+        $('#map-container').append('<h1>Solution'+i+'</h1>');
+        app.mapBuilder(null,data[i]);
+    };
+    
+}
+
 //wrapper function calls app.Map constructor on 'datafetched' event
 app.mapBuilder = function (event, data) {
-    for (var i = 0; i<data.d.length;i++){
-        data.d[i].route = data.d[i].route.replace(/{/, '').replace(/}/, '').split(',');
-        app.maps.push(new app.Map(i+1));
-        $(app).trigger('mapready', {route_id: data.d[i].route_id,map_id: i});
+    var routes_by_month = app.groupBy(data, function(item){return item.month});
+    var month_count = Object.keys(routes_by_month).length;
+    for (var i = 0; i<month_count;i++){ //replace this with a count of months. We'll always be making maps by month.
+        app.maps.push(new app.Map(i, routes_by_month[i][0].sol_id));
+        for (var o = 0; o<routes_by_month[i].length;o++){ //replace this with a count of months. We'll always be making maps by month.
+            routes_by_month[i][o].route = routes_by_month[i][o].route.replace(/{/, '').replace(/}/, '').split(',');
+            $(app).trigger('mapready', {route_id: routes_by_month[i][o].route_id,sol_id: routes_by_month[i][o].sol_id});
+        }
+
     }
+//    for (var i = 0; i<data.length;i++){ //replace this with a count of months. We'll always be making maps by month.
+//        data[i].route = data[i].route.replace(/{/, '').replace(/}/, '').split(',');
+//        app.maps.push(new app.Map(i, data[i].sol_id));
+//        $(app).trigger('mapready', {route_id: data[i].route_id,map_id: i});
+//    }
     $(app).trigger('mapsadded');
     
 }
@@ -52,6 +68,14 @@ app.getObjects = function(obj, key, val, sel) {
     }
     return objects;
 };
+
+app.getMap = function(obj, key, val){
+    for (var i = 0; i<obj.length; i++) {
+        if (obj[i][key] == val){
+            return(obj[i]);
+        }
+    }
+}; 
 
 //making a custom query function for coordinates, because they're buried deep.
 //might be cool to write a custom that could be plugged into the objects.push() statement in app.getObjects
@@ -80,7 +104,7 @@ app.addGeodata = function(){
 
 //get the route, look up the points by hosp id and make a line and add it to the map
 app.drawRoutes = function(event, data){
-    console.log(data.map_id);
+    console.log(data.sol_id);
     var results = app.getObjects(app.data,'route_id',data.route_id, 'route');
     var route = results[0]; //just one for now
     
@@ -91,13 +115,16 @@ app.drawRoutes = function(event, data){
         var c = app.getCoords(app.geodata.hospitals.features,route[i]);
         latlngs.push(L.latLng(c[1],c[0]));
     }
-    var polyline = L.polyline(latlngs,{color: 'red'}).addLatLng(app.geodata.kikwit); //add the depot
-    app.maps[data.map_id].map.addLayer(polyline);
+    var polyline = L.polyline(latlngs,{color: 'red'}).addLatLng(app.geodata.kikwit).bindPopup(data.route_id+': '+route); //add the depot
+    var ourmap = app.getMap(app.maps, 'sol_id', data.sol_id);
+    console.log(ourmap);
+    ourmap.map.addLayer(polyline);
 
 }
 
 //viewer should handle all different kinds of API requests.
 //decide which filter routines to call, end by triggering 'routesfiltered' with the data
+//HOWEVER: what is handy for filtering?
 app.filterRoutes = function(event, data){
     //check location string?
     // ...
@@ -111,17 +138,32 @@ app.filterRoutes = function(event, data){
     $(app).trigger('routesfiltered', data_filtered);
 }
 
+//learned this on http://codereview.stackexchange.com/questions/37028/grouping-elements-in-array-by-multiple-properties
+//modified to create an array of named objects rather than of arrays
+app.groupBy = function ( array , f ) {
+      var groups = {};
+      array.forEach( function( o )
+      {
+        var group = JSON.stringify( f(o) );
+        groups[group] = groups[group] || [];
+        groups[group].push( o );  
+      });
+        return groups;
+        //enable below instead to return arrays
+    //  return Object.keys(groups).map( function( group )
+    //  {
+    //    return groups[group]; 
+    //  })
+
+}
+
 
 //should group by run, solution, and month.
 app.groupBySolution = function(event, data){
-    var data_by_solution = data;
-    //var data_by_solution = [];
-//    for (var i in data.d){
-//    //var data_by_month = app.groupByMonth(data);
-//        var data_by_month = [];
-//        data_by_solution.push(data.d[i]);
-//    }
-    return(data_by_solution);
+    return(app.groupBy(data.d,function(item){
+            return item.sol_id;
+        })
+    );
     
     
     
@@ -165,7 +207,7 @@ $(document).ready(function ($) {
     
     //TODO: before calling mapbuilder, run the grouping routines to end up with routes grouped by month.
     $(app).on('datafetched',app.filterRoutes); //produces 'routesfiltered'
-    $(app).on('routesfiltered',app.mapBuilder);
+    $(app).on('routesfiltered',app.solutionBuilder);
     //$(app).on('datafetched',app.mapBuilder);
     $(app).on('geodatafetched',function(event,data){
         app.geodata.hospitals = JSON.parse(data);
