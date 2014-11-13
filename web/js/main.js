@@ -1,5 +1,9 @@
 var app = app || {};
 
+app.base_url = 'http://128.199.53.137:8080';
+app.url = '/routes/byrun/latest';
+
+
 //constructor to create a pane with Leaflet map and proper data bindings
 app.Map = function (num, sol_id) { //temporary solution: distinguish with solution id.
     var time = new Date();
@@ -176,14 +180,16 @@ app.groupByMonth = function(event, data){
     
 }
 
-app.dataFetcher = function(){
+app.dataFetcher = function(url){
+    var base_url = app.base_url;
+    var custom_url = url || app.url;
     $.ajax({
         //type: 'POST',
         type: 'GET',
         //url: 'data/seed.json',
        //url:'http://128.199.53.137:8080/routes/byid/1',
         //TODO: get url from location bar or user input on page
-        url:'http://128.199.53.137:8080/routes/byrun/latest',
+        url: base_url+custom_url,
         // url: 'http://192.168.122.116:3000/db/postgres/schemas/public/tables/',
         //data: request,
         dataType: 'json'
@@ -201,6 +207,55 @@ app.dataFetcher = function(){
     
 }
 
+
+app.selectDetector = function (event, e) {
+    e.preventDefault();
+    var t;
+    for (var i in e.target.children){
+        if (e.target.children[i].selected){
+            t = e.target.children[i].value;
+            $(app).trigger('select-option-chosen',{target:e.target,value:t});
+        }
+    }
+};
+
+//show and prime a route selector control
+app.switchSelectorControl = function(event, data){
+    if (data.value != 'Latest'){
+    $(data.target).siblings('form').css('display','inline').find('input').val(data.value).attr('data-type',data.value);
+    } else if (data.value == 'Latest'){
+     $(data.target).siblings('form').css('display','none').find('input').val(data.value).attr('data-type',data.value);
+        $(app).trigger('request-routes',data.value);
+    }   
+}
+
+app.prepareRoutesRequest = function(event,data){
+    
+    function composeUrl(val){
+        if (val == 'Latest'){
+            return('/routes/byrun/latest');
+        } else if (val == 'Select run'){
+            return('/routes/byrun/')
+        } else if (val == 'Select solution'){
+            return('/routes/bysolution/')
+        } else if (val == 'Select individual route') {
+            return('/routes/byid/')
+        }
+    }
+    //form submit
+    if (event.type == 'submit') {
+        event.preventDefault();
+        endpoint = event.target[0].value;
+        route = $(event.target[0]).attr('data-type');
+        app.dataFetcher(composeUrl(route)+endpoint);
+    
+    //select 'latest'
+    } else if (event.type='request-routes') {
+        app.dataFetcher(composeUrl(data));
+    }
+    return false;
+}
+
 $(document).ready(function ($) {
     
     //$(app).on('geodataparsed',app.addGeodata); //demo function: to test if the geojson works
@@ -216,6 +271,15 @@ $(document).ready(function ($) {
     });
     $(app).on('mapready', app.drawRoutes);
     
+    $(app).on('select-option-chosen', app.switchSelectorControl);
+    
+    //two handlers for preparing routes request
+    $(app).on('request-routes',app.prepareRoutesRequest);
+    $('form.select-input').on('submit',app.prepareRoutesRequest);
+    $(app).on('selector-clicked',app.selectDetector);
+    $(document).on('change', 'select', function(e){
+        $(app).trigger('selector-clicked',e)
+    }); 
     //for postgresql-http-server
     var request = {"sql":""};
     
