@@ -1,107 +1,164 @@
-following http://brian.akins.org/blog/2013/03/19/building-openresty-on-ubuntu/
+#Installing and configuring OpenResty/Nginx on Ubuntu 14.04
 
-adding postgresql stuff.
+##Goal
 
-#sudo apt-get -y install make ruby1.9.1 ruby1.9.1-dev git-core \
-libpcre3-dev libxslt1-dev libgd2-xpm-dev libgeoip-dev unzip zip build-essential 
+This should guide you through installing Openresty and using its nginx to create an HTTP API for Postgresql.
 
-apt-get install libreadline-dev libpcre3-dev libssl-dev perl
+We need to:
 
-sudo gem install fpm
+* download and install openresty with postgresql upstream support
+* setup openresty nginx as a 'service' with init.d
+* edit nginx's configuration file to create an API pointing to our database
 
-apt-get install postgresql postgresql-9.3-postgis-9.1 libpq5 libpq-dev
+## 1. Download and install Openresty
 
-wget http://openresty.org/download/ngx_openresty-1.7.4.1.tar.gz
+We need some dependencies, install them like this:
 
-tar -xzvf ngx_openresty-1.7.4.1.tar.gz
+    sudo apt-get install libpq-dev libreadline-dev libncurses5-dev libpcre3-dev libssl-dev perl make
 
-#the failing npm way from above tutorial
+If you don't have postgresql installed yet, you can get the required packages as followed (including postgis which we need for this project). Note in particular that libpq-dev is a requirement in both lists, we can't build openresty with the postgresql module unless we have it:
 
-apt-get -y install make ruby1.9.1 ruby1.9.1-dev git-core \
-libpcre3-dev libxslt1-dev libgd2-xpm-dev libgeoip-dev unzip zip build-essential 
+    sudo apt-get install postgresql postgresql-9.3-postgis-9.1 libpq5 libpq-dev
 
-cd ngx_openresty-1.7.4.1
+Find the latest openresty release from openresty.org/. Download it:
 
-./configure \
---with-luajit \
---sbin-path=/usr/sbin/nginx \
---conf-path=/etc/nginx/nginx.conf \
---error-log-path=/var/log/nginx/error.log \
---http-client-body-temp-path=/var/lib/nginx/body \
---http-fastcgi-temp-path=/var/lib/nginx/fastcgi \
---http-log-path=/var/log/nginx/access.log \
---http-proxy-temp-path=/var/lib/nginx/proxy \
---http-scgi-temp-path=/var/lib/nginx/scgi \
---http-uwsgi-temp-path=/var/lib/nginx/uwsgi \
---lock-path=/var/lock/nginx.lock \
---pid-path=/var/run/nginx.pid \
---with-http_dav_module \
---with-http_flv_module \
---with-http_geoip_module \
---with-http_gzip_static_module \
---with-http_image_filter_module \
---with-http_realip_module \
---with-http_stub_status_module \
---with-http_ssl_module \
---with-http_sub_module \
---with-http_xslt_module \
---with-ipv6 \
---with-sha1=/usr/include/openssl \
---with-md5=/usr/include/openssl \
---with-mail \
---with-mail_ssl_module \
---with-http_stub_status_module \
---with-http_secure_link_module \
---with-http_sub_module \
---with-http_postgres_module
+    wget http://openresty.org/download/ngx_openresty-1.7.4.1.tar.gz
+    
+extract it and enter the directory:
 
-make
+    tar -xzvf ngx_openresty-1.7.4.1.tar.gz
+    cd ngx_openresty-1.7.4.1
+    
+configure the installation. We want to enable the postgresql module:
 
-DESTDIR=/tmp/openresty
+    ./configure --with-http_postgres_module
+    
+next, install.
 
-make install DESTDIR=$DESTDIR
+    make
+    sudo make install
+    
+That should be all you need to install openresty.
 
-mkdir -p $INSTALL/var/lib/nginx
+## 2. set up openresty's nginx as a service
 
-install -m 0555 -D nginx.init $INSTALL/etc/init.d/nginx
+Note: this method will cause 'nginx' to run with openresty's version, so if you have nginx installed already it will be bypassed. See below for an alternative.
 
-install -m 0555 -D nginx.logrotate $INSTALL/etc/logrotate.d/nginx
+Edit or create the init script for nginx. If `/etc/init.d/nginx` exists, move it to `/etc/init.d/nginx-old` or something. Then copy the openresty init.d script (in this repository at `/server/nginx/etc/openresty.init.d.script` or from <https://fzrxefe.googlecode.com/files/openresty.init.d.script>) to `/etc/init.d/nginx`. The PREFIX variable in this file needs to be `/usr/local/openresty/nginx` if you installed as in step 1.
 
-fpm -s dir -t deb -n nginx -v 1.7.4 --iteration 1 -C $INSTALL \
---description "openresty 1.7.4.1" \
--d libxslt1.1 \
--d libgd2-xpm \
--d libgeoip1 \
--d libpcre3 \
---config-files etc/nginx/fastcgi.conf.default \
---config-files /etc/nginx/win-utf \
---config-files /etc/nginx/conf.d/default.conf \
---config-files /etc/nginx/fastcgi_params \
---config-files /etc/nginx/nginx.conf \
---config-files /etc/nginx/koi-win \
---config-files /etc/nginx/nginx.conf.default \
---config-files /etc/nginx/mime.types.default \
---config-files /etc/nginx/koi-utf \
---config-files /etc/nginx/uwsgi_params \
---config-files /etc/nginx/uwsgi_params.default \
---config-files /etc/nginx/sites-available/default \
---config-files /etc/nginx/fastcgi_params.default \
---config-files /etc/nginx/mime.types \
---config-files /etc/nginx/scgi_params.default \
---config-files /etc/nginx/scgi_params \
---config-files /etc/nginx/fastcgi.conf \
-etc usr var
+Note: alternative if you want to prevent collision with existing nginx: just put this script at `/etc/init.d/openrestify` and use `openrestify` instead of `nginx` in service management commands.
+
+To manage the service:
+
+    sudo service nginx start|stop|restart|reload
+    
+Note that of course the two nginx's will need to listen on different ports, as specified in the configuration file, see next step.
+
+## 3. Configure openresty/nginx to create a HTTP API for postgresql
+
+We'll do everything in the main `nginx.conf` located at `/usr/local/openresty/nginx/conf/nginx.conf` -- you could of course put these directives in a virtual host file.
+
+Here's the a complete configuration file, with comments below.
+
+    worker_processes 8;
+
+    events {}
+
+    http {
+      upstream database {
+        postgres_server 127.0.0.1 dbname=postgres user=postgres password=postgres;
+      }
+
+      server {
+        listen       8080;
+        server_name  localhost;
+        add_header Access-Control-Allow-Origin *;
+        root /usr/local/openresty/nginx/html;
+
+        # serve static files directly
+        location ~* \.(?:jpg|jpeg|gif|css|png|js|ico)$ {
+            access_log        off;
+            expires           30d;
+            add_header Pragma public;
+            add_header Cache-Control "public";
+            try_files $uri @fallback;
+        }
+
+        location  /routes {
+          postgres_pass database;
+          rds_json on;
+          postgres_query HEAD GET "select *, to_json(route) from (select * from drc.routes order by route_id desc limit 6) as foo order by route_id";
+          postgres_rewrite HEAD GET no_rows 410;
+        }
+
+        location ~ /routes/byid/(?<id>\d+) {
+          postgres_pass database;
+          rds_json on;
+          postgres_escape $escaped_id $id;
+          postgres_query HEAD GET "select * from drc.routes where route_id = $escaped_id";
+          postgres_rewrite HEAD GET no_rows 410;
+        }
+
+        location ~ /routes/byrun/(?<id>\d+) {
+          postgres_pass database;
+          rds_json  on;
+          postgres_escape $escaped_id $id;
+          postgres_query HEAD GET "select a.*, b.run_id from drc.routes a, (select sol_id, run_id from drc.solutions b where run_id = $escaped_id) as b where a. sol_id = b.sol_id";
+          postgres_rewrite HEAD GET no_rows 410;
+          add_header Access-Control-Allow-Origin *;
+        }
+       location ~ /routes/byrun/latest {
+          postgres_pass database;
+          rds_json  on;
+          postgres_query HEAD GET "select a.*, b.run_id from drc.routes a, (select sol_id, run_id from drc.solutions b where run_id = (select max(run_id) from drc.runs c) order by run_id desc limit 2) as b where a. sol_id = b.sol_id";
+          postgres_rewrite HEAD GET no_rows 410;
+          add_header Access-Control-Allow-Origin *;
+        }
+        location ~ /routes/bysolution/(?<id>\d+) {
+          postgres_pass database;
+          rds_json  on;
+          postgres_escape $escaped_id $id;
+          postgres_query HEAD GET "select * from drc.routes where sol_id = $escaped_id order by route_id";
+          postgres_rewrite HEAD GET no_rows 410;
+          add_header Access-Control-Allow-Origin *;
+        }
+      }
+    }
+
+We define an upstream for the postgresql database.
+
+The server directive listens on port 8080 and the root is openresty's default public html directory.
+
+For each endpoint on which users will be able to query, we define a location. Each location gets told about the database upstream, and turns on the rds_json module so we can serve json. The postgres_query parameter defines what query this will execute. Note the use of the id variable in some endpoints. We also create a rewrite to display an nginx error message when the database returns no rows. Finally we add an Allow-Origin header to enable cross-domain requests.
+
+After making changes to nginx.conf, you need to reload it for the changes to take effect:
+
+    sudo service nginx reload
+
+If you get errors, it may be your database connection parameters are incorrect or postgresql is not configured to allow tcp/ip connections. Check nginx's error log at /usr/local/openresty/nginx/logs/error.log and if you see postgres stuff, make sure you have:
+
+    host    all             all         all                trust
+
+in /etc/postgresql/<version>/main/pg_hba.conf
+
+and
+
+    listen_addresses = *
+
+in /etc/postgresql/<version>/main/postgresql.conf
+    
+These are insecure for production, but we're using these in a closed testing environment. More secure is to limit connection to localhost with:
+
+    host    all             all             127.0.0.1/32            md5
+
+in pg_hba.conf and
+
+    listen_addresses = 'localhost, 127.0.0.1'
+    
+in postgresql.conf
+
+Remember to reload postgresql after changing its configs:
+
+    sudo service postgresql reload|restart
 
 
-#the way from openresty.org
-
-make
-
-make install
-
-see 
-http://blog.kerkerj.in/blog/2014/08/05/openresty-on-ubuntu-14-dot-04/
-
-for an example of then setting up a demo.
-
-And how do we create an init.d script to run as a service?
