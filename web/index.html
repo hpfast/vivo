@@ -8,21 +8,31 @@
     <meta name='viewport' content='initial-scale=1.0 maximum-scale=1.0'>
 </head>
 <body>
-    <div id="control-bar">
-    <select>
-        <option>Latest</option>
-        <option>Select run</option>    
-        <option>Select solution</option>
-        <option>Select individual route</option>
-    </select>
-    <form class="select-input" id="input-1">
-        <input value=""></input>
-        <button type="submit">submit</button>
-    </form>
+    <div id="testdiv"></div>
+    <div class="group">
+        <div class="control-bar">
+        <select>
+            <option>Latest</option>
+            <option>Select run</option>    
+            <option>Select solution</option>
+            <option>Select individual route</option>
+        </select>
+        <form class="select-input" id="input-1">
+            <input value=""></input>
+            <button type="submit">submit</button>
+        </form>
+        </div>
+        <div id="map-container"></div> <!--change to class-->
     </div>
-    <div id="map-container"></div>
     <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
     <script src="js/jquery-2.1.1.min.js"></script>
+    <script src="js/jsrender.min.js"></script>
     <script src='js/main.js'></script>
+    
+    <script id="mainTmpl" type="text/x-jsrender">
+        <h1>A little template</h1>
+        <p>Just a little test, ok?</p>
+        <p>Take a look at our custom content: {{:string}}</p>
+    </script>
 </body>
 </html>
