@@ -1,3 +1,6 @@
+* {
+    box-sizing: border-box
+}
 .map{
     width:300px;
     height:250px;
@@ -16,4 +19,29 @@ h1{clear:both}
 
 .select-input{
     display:none;
+}
+
+
+/*CONTAINER STUFF*/
+.group{
+    border: 1px solid #aaa;
+    padding:5px;
+}
+
+
+/*DISPLAY STUFF*/
+
+.wrapper{
+    padding:1em
+}
+
+.content{
+    padding-top:39px
+}
+.home-menu{
+    background-color: #aaa !important;
+}
+.home-menu ul {
+    float:right;
+    margin-top:5px;
 }

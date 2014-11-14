@@ -3,27 +3,26 @@
 <head>
     <title>Vivo</title>
     <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+    <link rel="stylesheet" type="text/css" href="css/pure-min.css"/>
+    <link rel="stylesheet" type="text/css" href="css/grids-responsive-min.css"/>
     <link rel='stylesheet' type='text/css' href='css/main.css' />
     <meta http-equiv='content-type' content='text/html; charset=utf-8' />
     <meta name='viewport' content='initial-scale=1.0 maximum-scale=1.0'>
 </head>
 <body>
-    <div id="testdiv"></div>
-    <div class="group">
-        <div class="control-bar">
-        <select>
-            <option>Latest</option>
-            <option>Select run</option>    
-            <option>Select solution</option>
-            <option>Select individual route</option>
-        </select>
-        <form class="select-input" id="input-1">
-            <input value=""></input>
-            <button type="submit">submit</button>
-        </form>
+    <div class="outer-wrapper"><!--outer wrapper-->
+        <div class="home-menu pure-menu pure-menu-open pure-menu-horizontal pure-menu-fixed">
+            <a class="pure-menu-heading" href="/vivo">Vivo</a>
+            <ul>
+                <li id="new-container-button">New Route Group</li>
+            </ul>
         </div>
-        <div id="map-container"></div> <!--change to class-->
-    </div>
+        <div class="content">
+            <div class="wrapper group-wrapper"><!--to hold the route group divs-->
+            </div>
+        </div>
+
+    </div><!--END outer wrapper-->
     <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
     <script src="js/jquery-2.1.1.min.js"></script>
     <script src="js/jsrender.min.js"></script>
@@ -31,9 +30,22 @@
     <script src='js/config.js'></script>
     
     <script id="mainTmpl" type="text/x-jsrender">
-        <h1>A little template</h1>
-        <p>Just a little test, ok?</p>
-        <p>Take a look at our custom content: {{:string}}</p>
+        <div class="group">
+            <div class="control-bar">
+            <select>
+                <option>Latest</option>
+                <option>Select run</option>    
+                <option>Select solution</option>
+                <option>Select individual route</option>
+            </select>
+            <form class="select-input" id="input-1">
+                <input value=""></input>
+                <button type="submit">submit</button>
+            </form>
+            <button class="close-container">X</button>
+            </div>
+            <div id="map-wrapper"></div> <!--change to class-->
+        </div>
     </script>
 </body>
 </html>
