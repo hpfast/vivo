@@ -50,7 +50,7 @@ app.controls = (function() {
     }
 
     self.prepareRoutesRequest = function(event,data){
-
+        event.preventDefault();
         function composeUrl(val){
             if (val == 'Latest'){
                 return('/routes/byrun/latest');
@@ -67,11 +67,11 @@ app.controls = (function() {
             event.preventDefault();
             endpoint = event.target[0].value;
             route = $(event.target[0]).attr('data-type');
-            app.dataFetcher(app.base_url+composeUrl(route)+endpoint);
+            app.fetchData(app.conf.base_url+composeUrl(route)+endpoint);
 
         //select 'latest'
         } else if (event.type='request-routes') {
-            app.dataFetcher(app.base_url+composeUrl(data));
+            app.fetchData(app.conf.base_url+composeUrl(data));
         }
         return false;
     }
@@ -83,15 +83,16 @@ app.containers = [];
 //create a container obj with link to new rendered container div
 app.Container = function(parent_target) {
     var that = this;
+    this.routes = {};
     this.uuid = app.UUID.generate();
     this.tmpl = $.templates('#mainTmpl');
     this.html = this.tmpl.render(app.testdata);
+    this.fetchData = new app.DataFetcher();
     this.ourcontainer = $('<div id="'+this.uuid+'"  class="container">');
-    this.ourcontainer.promise().done(function(){
+    this.ourcontainer.html(this.html).promise().done(function(){
         //set up select listeners for container DIV when created
         $(app).trigger('container-created',this);
-    });
-    this.ourcontainer.html(this.html);
+    });;
     parent_target.append(this.ourcontainer);
 }
 
@@ -106,13 +107,6 @@ app.setUpSelectListeners = function(event, container){
     });
 };
 
-app.tearDownListeners = function(container){
-    //don't know if this actually is necessary if we destroy the whole object.
-    //or do remaining references via listeners keep container from being GC'd?
-    //in that case need to remove the other ones as well ...
-    $(container).off({keys:'request-routes select-option-chosen click'});   
-}
-
 app.destroyContainer = function(event){
     target = event.delegateTarget;
     var id = $(target).attr('id');
@@ -126,9 +120,77 @@ app.destroyContainer = function(event){
         }
     };
     app.containers.splice(index,1);
-    
-    
 };
+
+app.tearDownListeners = function(container){
+    //don't know if this actually is necessary if we destroy the whole object.
+    //or do remaining references via listeners keep container from being GC'd?
+    //in that case need to remove the other ones as well ...
+    $(container).off({keys:'request-routes select-option-chosen click'});   
+}
+
+app.DataFetcher = function(url){
+    $.ajax({
+        type: 'GET',
+        url: url,
+        dataType: 'json'
+    })
+      .done(function(data,statusText,jqXHR){
+        //pass on data and request endpoint type
+        $(this).trigger('datafetched',{
+            d:data,
+            r:this.url.match('/routes/(.*)/')[1]});
+    })
+      .fail(function(data,statusText,jqXHR){
+        console.log(statusText,jqXHR);
+    });   
+};
+
+
+//learned this on http://codereview.stackexchange.com/questions/37028/grouping-elements-in-array-by-multiple-properties
+//modified to create an array of named objects rather than of arrays
+app.groupBy = function ( array , f, type) {
+      var groups = {};
+      array.forEach( function( o )
+      {
+        var group = JSON.stringify( f(o) );
+        groups[group] = groups[group] || [];
+        groups[group].push( o );  
+      });
+    if (type && type == 'object'){
+        return groups;
+    } else if (type && type == 'array'){
+        //enable below instead to return arrays
+      return Object.keys(groups).map( function( group )
+      {
+        return groups[group]; 
+      })
+    }
+}
+
+//group by month, solution, and run.
+//if passed context, puts grouped data in its routes object.
+//else returns grouped data.
+app.groupRoutes = function(event, data, context){
+    var data_grouped = {};
+    var temp_sol = {};
+    var by_run = app.groupBy(data.d, function(item){return item.run_id}, 'object');
+    for (var i in by_run){
+        temp_sol[i] = app.groupBy(by_run[i], function(item){return item.sol_id}, 'object');
+        data_grouped[i] = {};
+        for (var j in temp_sol[i]){
+            data_grouped[i][j] = app.groupBy(temp_sol[i][j],function(item){return item.month}, 'object');
+        }
+    };
+    if (context) {
+        context.routes = data_grouped;
+        return true;
+    } else {
+        return data_grouped;
+    }
+    //console.log(data_grouped);       
+};
+
 $(document).ready(function($){
     app.conf = custom_config || {};
     $(document).on('click','#new-container-button',function(e){
@@ -145,7 +207,8 @@ $(document).ready(function($){
     }); 
     
     $(app).on('container-created',app.setUpSelectListeners);
-    //make a new container in the group container div
+    
+    //On page load, make a new container in the group container div
     app.containers.push(new app.Container($('.group-wrapper')));
     
 });
