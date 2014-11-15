@@ -23,6 +23,9 @@ app.UUID = (function() {
   return self;
 })();
 
+app.geodata = {};
+app.geodata.kikwit = L.latLng(-5.021301252987202,18.824065464564228);
+
 //create controls as a 'module' like UUID
 app.controls = (function() {
     self = {};
@@ -51,6 +54,7 @@ app.controls = (function() {
 
     self.prepareRoutesRequest = function(event,data){
         event.preventDefault();
+        var context = event.data;
         function composeUrl(val){
             if (val == 'Latest'){
                 return('/routes/byrun/latest');
@@ -67,16 +71,17 @@ app.controls = (function() {
             event.preventDefault();
             endpoint = event.target[0].value;
             route = $(event.target[0]).attr('data-type');
-            app.fetchData(app.conf.base_url+composeUrl(route)+endpoint);
+            context.dataFetcher.fetchData(app.conf.base_url+composeUrl(route)+endpoint);
 
         //select 'latest'
         } else if (event.type='request-routes') {
-            app.fetchData(app.conf.base_url+composeUrl(data));
+            context.dataFetcher.fetchData(app.conf.base_url+composeUrl(data));
         }
         return false;
     }
     return self;
 })();
+
 
 app.containers = [];
 
@@ -84,27 +89,36 @@ app.containers = [];
 app.Container = function(parent_target) {
     var that = this;
     this.routes = {};
+    this.maps = [];
     this.uuid = app.UUID.generate();
     this.tmpl = $.templates('#mainTmpl');
     this.html = this.tmpl.render(app.testdata);
-    this.fetchData = new app.DataFetcher();
     this.ourcontainer = $('<div id="'+this.uuid+'"  class="container">');
-    this.ourcontainer.html(this.html).promise().done(function(){
-        //set up select listeners for container DIV when created
-        $(app).trigger('container-created',this);
-    });;
+    this.dataFetcher = new app.DataFetcher(this.ourcontainer);
+    this.ourcontainer.html(this.html)
     parent_target.append(this.ourcontainer);
+    //setter function that triggers an event when routes are added
+    this.addRoutes = function(data, context){
+        context.routes = data;
+        $(context.ourcontainer).trigger('routesadded',context);
+    };
+    $(app).trigger('container-created',{container:this.ourcontainer,context:that});
 }
 
 //we set up listeners for the route selector controls,
 //binding them to the container in question
-app.setUpSelectListeners = function(event, container){
-    $(container).on('request-routes',app.controls.prepareRoutesRequest);
-    $(container).find('form.select-input').on('submit',app.controls.prepareRoutesRequest);
-    $(container).on('select-option-chosen',app.controls.switchSelectorControl);
-    $(container).on('click','.close-container',function(e){
+app.setUpSelectListeners = function(event, d){
+    $(d.container).on('request-routes',app.controls.prepareRoutesRequest);
+    $(d.container).find('form.select-input').on('submit',d.context,app.controls.prepareRoutesRequest);
+    $(d.container).on('select-option-chosen',app.controls.switchSelectorControl);
+    $(d.container).on('click','.close-container',function(e){
         app.destroyContainer(e)
     });
+    //pass context to groupRoutes so it 
+    $(d.container).on('datafetched', function(event, data){
+        app.groupRoutes(event,data,d.context,d.context.addRoutes);
+    });
+    //$(d.container).on('routesadded',);
 };
 
 app.destroyContainer = function(event){
@@ -129,21 +143,25 @@ app.tearDownListeners = function(container){
     $(container).off({keys:'request-routes select-option-chosen click'});   
 }
 
-app.DataFetcher = function(url){
-    $.ajax({
-        type: 'GET',
-        url: url,
-        dataType: 'json'
-    })
-      .done(function(data,statusText,jqXHR){
-        //pass on data and request endpoint type
-        $(this).trigger('datafetched',{
-            d:data,
-            r:this.url.match('/routes/(.*)/')[1]});
-    })
-      .fail(function(data,statusText,jqXHR){
-        console.log(statusText,jqXHR);
-    });   
+app.DataFetcher = function(context){
+    var context = context;
+    this.fetchData = function(url){
+        $.ajax({
+            type: 'GET',
+            url: url,
+            dataType: 'json'
+        })
+          .done(function(data,statusText,jqXHR){
+            //pass on data and request endpoint type
+            $(context).trigger('datafetched',{
+                d:data,
+                r:this.url.match('/routes/(.*)/')[1]
+              });
+        })
+          .fail(function(data,statusText,jqXHR){
+            console.log(statusText,jqXHR);
+        }); 
+    }
 };
 
 
@@ -169,9 +187,9 @@ app.groupBy = function ( array , f, type) {
 }
 
 //group by month, solution, and run.
-//if passed context, puts grouped data in its routes object.
+//if passed context and callback, executes callback with context.
 //else returns grouped data.
-app.groupRoutes = function(event, data, context){
+app.groupRoutes = function(event, data, context, callback){
     var data_grouped = {};
     var temp_sol = {};
     var by_run = app.groupBy(data.d, function(item){return item.run_id}, 'object');
@@ -182,8 +200,9 @@ app.groupRoutes = function(event, data, context){
             data_grouped[i][j] = app.groupBy(temp_sol[i][j],function(item){return item.month}, 'object');
         }
     };
-    if (context) {
-        context.routes = data_grouped;
+    if (context && callback) {
+        //context.addRoutes(data_grouped); //only semi-encapsulated ...
+        callback(data_grouped,context);    //slightly better ...
         return true;
     } else {
         return data_grouped;
