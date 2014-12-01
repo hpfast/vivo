@@ -53,15 +53,15 @@
         </div>
     </script>
     <script id="solTmpl" type="text/x-jsrender">
-        <div class="sol-wrapper" id="sol-"{{:sol-id}}>
-            <h4>Solution {{:sol-id}}</h4>
+        <div class="sol-wrapper" id="sol-{{:sol_id}}">
+            <h4>Solution {{:sol_id}}</h4>
         </div>
     
     </script>
     <script id="monthTmpl" type="text/x-jsrender">
-        <div class="month-wrapper" id="month-{{:month-id}}>
-            <h5>Month {{:month-id}}</h5>
-            <div class="map" id="map-{{:sol-id}}-{{:month-id}}"></div>
+        <div class="month-wrapper" id="sol-{{:sol_id}}-month-{{:month.id}}">
+            <h5>Month {{:month.id}}</h5>
+            <div class="map" id="map-{{:sol_id}}-{{:month.id}}"></div>
             <div class="route-list-pane"></div>
         </div>
     </script>

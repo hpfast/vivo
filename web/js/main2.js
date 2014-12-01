@@ -57,13 +57,13 @@ app.controls = (function() {
         } else if (data.value == 'Latest'){
             $(data.target).siblings('form').css('display','none')
               .find('input').val(data.value).attr('data-type',data.value);
-            $(app).trigger('request-routes',data.value);
+            $(data.container).trigger('request-routes',data.value);
         }   
     }
 
     self.prepareRoutesRequest = function(event,data){
         event.preventDefault();
-        var context = event.data;
+        var context = event.data || event.target;
         function composeUrl(val){
             if (val == 'Latest'){
                 return('/routes/byrun/latest');
@@ -121,14 +121,15 @@ app.Container = function(parent_target) {
     //this could be a generalized function that just appends the div, renders the given template,
     //and sets the resulting html as the content of the template, then triggering another custom event.
     this.resOlve = function(targetdiv, container, data, template){
-        var that = that;
+        var that = this;
         var dfd = $.Deferred();
-        var tmpl = $.templates('#runTmpl');
-        var html = tmpl.render(data);
-        var ourdiv = $('<div id="boooh">').appendTo(targetdiv);
+        var tmpl = $.templates(template);
+        var findParent = function(){$(this).parent()};
+        var html = tmpl.render(data,{findParent:findParent});
+        var uuid = app.UUID.generate();
+        var ourdiv = $('<div id="'+uuid+'">').appendTo(targetdiv);
         ourdiv.html(html).promise().done(function(){
-            var that = this;
-            $(container).trigger(template+'-added', {d:data,that:that});
+            $(container).trigger(template+'-added', {d:data,that:that,self:this});
         });
     }
     
@@ -143,7 +144,7 @@ app.Container = function(parent_target) {
 //we set up listeners for the route selector controls,
 //binding them to the container in question
 app.setUpSelectListeners = function(event, d){
-    $(d.container).on('request-routes',app.controls.prepareRoutesRequest);
+    $(d.container).on('request-routes',d.context,app.controls.prepareRoutesRequest);
     $(d.container).find('form.select-input').on(
         'submit',
         d.context,
@@ -161,14 +162,16 @@ app.setUpSelectListeners = function(event, d){
         $(data.ourcontainer).find('.map-wrapper').empty();
         app.runBuilder(event,data);
     });
-    $(d.container).on('run-added',app.solutionBuilder);
+    $(d.container).on('#runTmpl-added',app.solutionBuilder);
+    $(d.container).on('#solTmpl-added',app.monthBuilder);
+    $(d.container).on('#monthTmpl-added',app.mapBuilder);
+    $(d.container).on('routeready', app.drawRoutes);
+    $(d.container).trigger('request-routes','Latest');
 };
 
 //constructor to create a pane with Leaflet map and proper data bindings
-app.Map = function (data, target,i) { //temporary solution: distinguish with solution id.
-    var id = $(target).attr('id')+'-'+i;
-    $(target).append($('<div id="'+id+'-box" class="map-box"><div id="'+id+'-map" class="map"></div>'));
-    this.map = new L.Map(id+'-map',
+app.Map = function (mapdivid) { //temporary solution: distinguish with solution id.
+    this.map = new L.Map(mapdivid,
                          {zoomControl: false,
                           attributionControl: false
                          }
@@ -185,7 +188,8 @@ app.Map = function (data, target,i) { //temporary solution: distinguish with sol
                          );
     var mq=L.tileLayer(mopt.url,mopt.options);
     mq.addTo(this.map);
-    $('#'+id+'-map').before($('<h3>Month '+i+'</h3>'));
+    this.mapid = mapdivid;
+   // $('#'+id+'-map').before($('<h3>Month '+i+'</h3>'));
 
     
     
@@ -224,41 +228,99 @@ app.Map = function (data, target,i) { //temporary solution: distinguish with sol
 //    
 //}
 
+//return sel from obj where key equals val
+app.getObjects = function(obj, key, val, sel) {
+    var objects = [];
+    for (var i in obj) {
+        if (!obj.hasOwnProperty(i)) continue;
+        if (typeof obj[i] == 'object') {
+            objects = objects.concat(app.getObjects(obj[i], key, val,sel));
+        } else if (i == key && obj[key] == val) {
+            objects.push(obj[sel]);
+        }
+    }
+    return objects;
+};
+
+app.getMap = function(obj, key, val){
+    for (var i = 0; i<obj.length; i++) {
+        if (obj[i][key] == val){
+            return(obj[i]);
+        }
+    }
+}; 
+
+//making a custom query function for coordinates, because they're buried deep.
+//might be cool to write a custom that could be plugged into the objects.push() statement in app.getObjects
+app.getCoords = function(obj, val) {
+    var objects = [];
+    for (var i in obj) {
+        if (obj[i].properties.hz_id == val){
+            return(obj[i].geometry.coordinates);
+        }
+    }
+};
+
+//get the route, look up the points by hosp id and make a line and add it to the map
+app.drawRoutes = function(event, data){
+    console.log(event);
+    console.log(data.route.sol_id);
+    var results = app.getObjects(data.that.routes,'route_id',data.route.route_id, 'route');
+    var route = results[0]; //just one for now
+    
+    //we need to draw the polylines and draw the points separately
+    //TODO: group by solution, month etc
+    var latlngs = [];
+    for (var i in route){
+        var c = app.getCoords(app.geodata.hospitals.features,route[i]);
+        latlngs.push(L.latLng(c[1],c[0]));
+    }
+    var polyline = L.polyline(latlngs,{color: 'red'}).addLatLng(app.geodata.kikwit).bindPopup(data.route_id+': '+route); //add the depot
+    var ourmap = app.getMap(data.that.maps, 'mapid', data.mapid);
+    ourmap.map.addLayer(polyline);
+
+}
+
 app.runBuilder = function(event, data){
     //first loop:
     for (var i in data.routes){
         var wrapper= $(data.ourcontainer).find('.map-wrapper');
         var uuid = app.UUID.generate();
-        data.resOlve(wrapper,data.ourcontainer,data.routes[i], 'run');
+        data.resOlve(wrapper,data.ourcontainer,data.routes[i], '#runTmpl');
     }
        
     
 }
 
 app.solutionBuilder = function(event, data){
-    console.log("let's see what THIS is ... ");
-    console.log(data.that);
+    var that = data.that;
     for (var i=0;i<data.d.data.length;i++){
-        console.log(data.d.data[i]);
+        data.that.resOlve($(data.self).find('.run-wrapper'),that.ourcontainer,data.d.data[i], '#solTmpl');
     }
 }
+
+
+app.monthBuilder = function(event, data){
+    var that = data.that;
+    var months = data.d.months;
+    for (var i = 0; i < months.length; i++) {
+        data.that.resOlve($(data.self).find('.sol-wrapper'),that.ourcontainer,{sol_id:data.d.sol_id,month:months[i]}, '#monthTmpl');   
+    }
     
+}
 
 app.mapBuilder = function (event, data) {
-    var month_count = data.months.length;
-    for (var i = 0; i<month_count;i++){ 
-        app.maps.push(new app.Map(i, routes_by_month[i][0].sol_id));
-        for (var o = 0; o<routes_by_month[i].length;o++){ 
-            routes_by_month[i][o].route = routes_by_month[i][o].route
+    var that = data.that;
+    var routes = data.d.month.data;
+    var mapdivid = 'map-'+data.d.sol_id+'-'+data.d.month.id;
+    that.maps.push(new app.Map(mapdivid));
+    for (var i = 0; i<routes.length;i++){ 
+            var route = routes[i];
+            route.route = route.route
               .replace(/{/, '').replace(/}/, '').split(',');
-            $(app).trigger('mapready',
-                           {route_id: routes_by_month[i][o].route_id
-                            ,sol_id: routes_by_month[i][o].sol_id
-                           }
-            );
-        }
+            $(that.ourcontainer).trigger('routeready',{that:that,route:route,mapid:mapdivid});
     }
-    $(app).trigger('mapsadded');
+    $(that.ourcontainer).trigger('mapsadded');
 }
 
 app.destroyContainer = function(event){
@@ -372,7 +434,13 @@ $(document).ready(function($){
         //two handlers for preparing routes request
    // $(app).on('request-routes',app.prepareRoutesRequest);
    // $('form.select-input').on('submit',app.prepareRoutesRequest);
-    
+    $(app).on('geodataparsed',function(event,data){
+        app.containers.push(new app.Container($('.group-wrapper')));
+    });
+    $(app).on('geodatafetched',function(event,data){
+        app.geodata.hospitals = JSON.parse(data);
+        $(app).trigger('geodataparsed');
+    });
     $(app).on('selector-clicked',app.controls.selectDetector);
     //general listener for all selects. We'll detect which container it targets
     $(document).on('change', 'select', function(e){
@@ -382,6 +450,13 @@ $(document).ready(function($){
     $(app).on('container-created',app.setUpSelectListeners);
     
     //On page load, make a new container in the group container div
-    app.containers.push(new app.Container($('.group-wrapper')));
+
     
+    $.ajax({
+        type: 'GET',
+        url: 'data/hospitals.geojson',
+        datatype: 'json'
+    }).done(function(data,statusText,jqXHR){
+        $(app).trigger('geodatafetched',data)
+    }); 
 });
