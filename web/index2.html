@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Vivo</title>
-    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+    <link rel="stylesheet" href="css/leaflet.css" />
     <link rel="stylesheet" type="text/css" href="css/pure-min.css"/>
     <link rel="stylesheet" type="text/css" href="css/grids-responsive-min.css"/>
     <link rel='stylesheet' type='text/css' href='css/main.css' />
@@ -24,6 +24,7 @@
 
     </div><!--END outer wrapper-->
     <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+    <script src="js/leaflet-omnivore.min.js"></script>
     <script src="js/jquery-2.1.1.min.js"></script>
     <script src="js/jsrender.min.js"></script>
     <script src='js/main2.js'></script>
@@ -48,13 +49,16 @@
         </div>
     </script>
     <script id="runTmpl" type="text/x-jsrender">
-        <div class="run-wrapper" id="run-{{:run_id}}">
+        <div class="run-wrapper" id="run-{{:run_id}}"> 
             <h3>Run {{:run_id}}</h3>
         </div>
     </script>
     <script id="solTmpl" type="text/x-jsrender">
-        <div class="sol-wrapper" id="sol-{{:sol_id}}">
+        <div class="sol-wrapper pure-g" id="sol-{{:sol_id}}">
+            <div class="pure-u-1 pure-u-md-1-8">
             <h4>Solution {{:sol_id}}</h4>
+            </div>
+            <div class="pure-u-1 pure-u-md-7-8"></div>
         </div>
     
     </script>
@@ -62,8 +66,27 @@
         <div class="month-wrapper" id="sol-{{:sol_id}}-month-{{:month.id}}">
             <h5>Month {{:month.id}}</h5>
             <div class="map" id="map-{{:sol_id}}-{{:month.id}}"></div>
-            <div class="route-list-pane"></div>
         </div>
+    </script>
+    <script id="routeListTmpl" type="text/x-jsrender">
+            <div class="route-list-obj" data-id={{:id}}>
+                <div class="route-line">
+                    <p class="route-id">{{:id}}</p>
+                        {{for route}}
+                            <div class="route-node">
+                                <span class="node-num">{{:node}}</span>
+                                <span class="node-attrs">
+                                    {{if pickup}}<span class="pickup">p</span>{{/if}}
+                                    {{if dropoff}}<span class="dropoff">d</span>{{/if}}
+                                    {{if med}}<span class="med">m</span>{{/if}}
+                                </span>
+                            </div>
+                        {{/for}}
+        
+                </div>
+            </div>
+    
+    
     </script>
     
 </body>

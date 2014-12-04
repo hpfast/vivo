@@ -1,10 +1,12 @@
 * {
     box-sizing: border-box
 }
+
+
 .map{
     width:300px;
     height:250px;
-    float:left;
+/*    float:left;*/
     margin:5px;
 }
 
@@ -25,7 +27,7 @@ h1{clear:both}
 /*CONTAINER STUFF*/
 .group{
     border: 1px solid #aaa;
-    padding:5px;
+/*    padding:5px;*/
 }
 
 
@@ -44,6 +46,70 @@ h1{clear:both}
 .home-menu ul {
     float:right;
     margin-top:5px;
+    margin-bottom:5px;
 }
 
 .sol-wrapper{clear:both}
+
+
+.month-wrapper{
+    max-width:600px;
+    display:inline-table;
+}
+
+#new-container-button{
+    background-color:#C9E7EE;
+    cursor:pointer;
+    padding:7px;
+    border-radius:5px;
+}
+#new-container-button:hover{
+    opacity:0.5;
+}
+
+@media only screen and (min-width:300px){
+.close-container{
+    position:absolute;
+    right:0;
+    top:0;
+}
+}
+
+.control-bar{
+    position:relative
+}
+
+.route-line{
+    vertical-align: top;
+}
+
+.route-list{
+    max-height:200px;
+    overflow:auto
+}
+
+.route-list-obj{
+    cursor:pointer
+}
+.route-list-obj:hover{
+    background-color:rgba(255,147,6,0.5)
+}
+
+.route-node:nth-child(2) .node-num{
+    color:#aaa;
+}
+.route-node{
+    display:inline-table;
+}
+
+.route-id{
+    vertical-align: top;
+    display:inline;
+}
+
+.node-attrs{
+    clear:both;
+    display:block;
+    font-size:0.8em;
+    color:#777
+}

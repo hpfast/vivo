@@ -103,6 +103,7 @@ app.Container = function(parent_target) {
     var that = this;
     this.routes = {};
     this.maps = [];
+    this.layers = []; //to save a reference to layers we add to the map, for event hooks
     this.uuid = app.UUID.generate();
     this.tmpl = $.templates('#mainTmpl');
     this.html = this.tmpl.render(app.testdata);
@@ -125,11 +126,13 @@ app.Container = function(parent_target) {
         var dfd = $.Deferred();
         var tmpl = $.templates(template);
         var findParent = function(){$(this).parent()};
-        var html = tmpl.render(data,{findParent:findParent});
+        //var html = tmpl.render(data,{findParent:findParent});
         var uuid = app.UUID.generate();
-        var ourdiv = $('<div id="'+uuid+'">').appendTo(targetdiv);
-        ourdiv.html(html).promise().done(function(){
-            $(container).trigger(template+'-added', {d:data,that:that,self:this});
+        //var ourdiv = $('<div id="'+uuid+'">').appendTo(targetdiv);
+        var ourdiv = $(tmpl.render(data,{findParent:findParent}));
+        //ourdiv.html(html).promise().done(function(){
+        targetdiv.append(ourdiv).promise().done(function(){
+        $(container).trigger(template+'-added', {d:data,that:that,self:ourdiv});//this
         });
     }
     
@@ -165,8 +168,10 @@ app.setUpSelectListeners = function(event, d){
     $(d.container).on('#runTmpl-added',app.solutionBuilder);
     $(d.container).on('#solTmpl-added',app.monthBuilder);
     $(d.container).on('#monthTmpl-added',app.mapBuilder);
-    $(d.container).on('routeready', app.drawRoutes);
+    $(d.container).on('routesready', app.drawRoutes);
     $(d.container).trigger('request-routes','Latest');
+    $(d.container).on('routes-drawn',app.addRoutesToList);
+    $(d.container).on('#routeListTmpl-added', app.addRouteListListeners);
 };
 
 //constructor to create a pane with Leaflet map and proper data bindings
@@ -189,10 +194,38 @@ app.Map = function (mapdivid) { //temporary solution: distinguish with solution 
     var mq=L.tileLayer(mopt.url,mopt.options);
     mq.addTo(this.map);
     this.mapid = mapdivid;
-   // $('#'+id+'-map').before($('<h3>Month '+i+'</h3>'));
+    
+    app.hzlayer = L.geoJson(null, {
+        style: function(feature){
+            return {
+                color:'#333',
+                weight: 1,
+                opacity: 1,
+                fillOpacity:'0'
+            };
+        }
+    })
+    
+        var geojsonMarkerOptions = {
+        radius: 2,
+        fillColor: "#fff",
+        color: "#333",
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.8
+    };
+    
+    app.hslayer = L.geoJson(null, {
+         pointToLayer: function(feature, latlng){
+            return L.circleMarker(latlng,geojsonMarkerOptions);
+        }
+    });
+    
+    omnivore.topojson('data/hz-bandundu.topojson',null,app.hzlayer)
+    .addTo(this.map);
+    omnivore.topojson('data/hs-bandundu.topojson',null,app.hslayer).addTo(this.map);
+            
 
-    
-    
 };
 //need to reparse the nice hierarchical data structure for jsrender :(
 //app.runBuilder = function(event, data){
@@ -261,24 +294,97 @@ app.getCoords = function(obj, val) {
     }
 };
 
-//get the route, look up the points by hosp id and make a line and add it to the map
+//draw all routes
 app.drawRoutes = function(event, data){
+    var routes = data.routes;
+    for (var i=0; i<routes.length;i++){
+        app.drawRoute(null,{that:data.that,route:routes[i],mapid:data.mapid}); 
+    }
+    $(data.that.ourcontainer).trigger('routes-drawn', {mapid:data.mapid,that:data.that,routes:routes});
+
+}
+
+//get the route, look up the points by hosp id and make a line and add it to the map
+app.drawRoute = function(event, data){
+    var colorhex = '#' + (Math.random().toFixed(6).toString(16)).slice(2);
     console.log(event);
     console.log(data.route.sol_id);
     var results = app.getObjects(data.that.routes,'route_id',data.route.route_id, 'route');
     var route = results[0]; //just one for now
     
     //we need to draw the polylines and draw the points separately
-    //TODO: group by solution, month etc
     var latlngs = [];
+    //always start at 223
+    if (route[0] != '223'){
+        route.unshift('223');
+    };
     for (var i in route){
         var c = app.getCoords(app.geodata.hospitals.features,route[i]);
         latlngs.push(L.latLng(c[1],c[0]));
     }
-    var polyline = L.polyline(latlngs,{color: 'red'}).addLatLng(app.geodata.kikwit).bindPopup(data.route_id+': '+route); //add the depot
+    var polyline = L.polyline(latlngs,{color: colorhex}).addLatLng(app.geodata.kikwit).bindPopup(data.route.route_id+': '+route); //add the depot
+    //save reference to layer!
+    data.that.layers.push({route_id:data.route.route_id,layer:polyline});
     var ourmap = app.getMap(data.that.maps, 'mapid', data.mapid);
     ourmap.map.addLayer(polyline);
+}
 
+
+app.addRoutesToList = function(event, data) {
+    var ourmap = app.getMap(data.that.maps, 'mapid', data.mapid);
+    var mapcontainer = ourmap.map._container;
+    var listcontainer = $('<div class="route-list" id="list-'+data.mapid+'">');
+    $(mapcontainer).after(listcontainer);
+    var ourroutes = [];
+    for (var i=0;i<data.routes.length;i++){
+        ourroutes.push(app.formatRouteForList(data.routes[i]));
+    };
+    
+    data.that.resOlve(listcontainer,data.that.ourcontainer,ourroutes,'#routeListTmpl');
+    
+    
+}
+
+//parse the route object to add hooks for styling the node types
+app.formatRouteForList = function(route){
+    console.log(route);
+    var out = {};
+    out.id = route.route_id;
+    out.cost = route.route.cost;
+    out.route = [];
+    var med = route.med
+      .replace(/{/, '').replace(/}/, '').split(',');
+    for (var i=0;i<route.route.length;i++){
+        var it = route.route[i];
+        var newroute = {};
+        newroute.node = it;
+        if (med.indexOf(it) != -1) {
+            newroute.med = true;
+        };
+        if (route.pickup && route.pickup == it){
+            newroute.pickup = true;
+        };
+        if (route.dropoff && route.dropoff == it){
+            newroute.dropoff = true;
+        };
+        out.route.push(newroute);
+    }
+    return out;
+};
+
+app.addRouteListListeners = function(event, data){
+    data.self.on('mouseover',data,function(event){
+        var routeid = event.currentTarget.getAttribute('data-id');
+        console.log('we hovered over '+routeid);
+        var targetlayer = app.getMap(event.data.that.layers,'route_id',routeid);//reuse getMap because it returns a single item from an array
+        targetlayer.originalStyle = targetlayer.layer.options;
+        targetlayer.layer.setStyle({weight:10,color:'#ff9306'});
+    }).on('mouseout',data,function(event){
+        var routeid = event.currentTarget.getAttribute('data-id');
+        var targetlayer = app.getMap(event.data.that.layers,'route_id',routeid);
+        targetlayer.layer.setStyle(targetlayer.originalStyle);
+        
+    });
 }
 
 app.runBuilder = function(event, data){
@@ -295,7 +401,8 @@ app.runBuilder = function(event, data){
 app.solutionBuilder = function(event, data){
     var that = data.that;
     for (var i=0;i<data.d.data.length;i++){
-        data.that.resOlve($(data.self).find('.run-wrapper'),that.ourcontainer,data.d.data[i], '#solTmpl');
+        data.that.resOlve($(data.self),//.find('.run-wrapper'),
+                          that.ourcontainer,data.d.data[i], '#solTmpl');
     }
 }
 
@@ -304,7 +411,8 @@ app.monthBuilder = function(event, data){
     var that = data.that;
     var months = data.d.months;
     for (var i = 0; i < months.length; i++) {
-        data.that.resOlve($(data.self).find('.sol-wrapper'),that.ourcontainer,{sol_id:data.d.sol_id,month:months[i]}, '#monthTmpl');   
+        data.that.resOlve($(data.self).find('.pure-u-md-7-8'),//.find('.sol-wrapper'),
+                          that.ourcontainer,{sol_id:data.d.sol_id,month:months[i]}, '#monthTmpl');   
     }
     
 }
@@ -318,8 +426,9 @@ app.mapBuilder = function (event, data) {
             var route = routes[i];
             route.route = route.route
               .replace(/{/, '').replace(/}/, '').split(',');
-            $(that.ourcontainer).trigger('routeready',{that:that,route:route,mapid:mapdivid});
+
     }
+    $(that.ourcontainer).trigger('routesready',{that:that,routes:routes,mapid:mapdivid});
     $(that.ourcontainer).trigger('mapsadded');
 }
 
