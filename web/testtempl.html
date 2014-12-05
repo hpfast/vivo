@@ -9,30 +9,29 @@
 </head>
 <body>
     <div id="testdiv"></div>
-    <div class="group">
-        <div class="control-bar">
-        <select>
-            <option>Latest</option>
-            <option>Select run</option>    
-            <option>Select solution</option>
-            <option>Select individual route</option>
-        </select>
-        <form class="select-input" id="input-1">
-            <input value=""></input>
-            <button type="submit">submit</button>
-        </form>
-        </div>
-        <div id="map-container"></div> <!--change to class-->
-    </div>
     <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
     <script src="js/jquery-2.1.1.min.js"></script>
     <script src="js/jsrender.min.js"></script>
-    <script src='js/main.js'></script>
+    <script src="data/testdata.js"></script>
+    <script src='js/testtempl.js'></script>
     
     <script id="mainTmpl" type="text/x-jsrender">
         <h1>A little template</h1>
         <p>Just a little test, ok?</p>
-        <p>Take a look at our custom content: {{:string}}</p>
+        <p>Take a look at our custom content</p>
+        {{for #data}}
+            <h1>Run {{:run_id}}</h1>
+            {{for data}}
+                <h2>Solution {{:sol_id}}</h2>
+                {{include tmpl="#monthTmpl"/}}
+            {{/for}}
+        {{/for}}
+    </script>
+    <script id="monthTmpl" type="text/x-jsrender">
+        {{for months}}
+            <h3>Month {{:id}}</h3>
+            <div id="map-{{>#parent.parent.data.sol_id}}-{{:id}}" class="map"></div>
+        {{/for}}
     </script>
 </body>
 </html>
