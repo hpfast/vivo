@@ -1,5 +1,4 @@
 *.geany
-*.geojson
 *.pyc
 script/userconfig.py
 
