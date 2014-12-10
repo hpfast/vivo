@@ -5,3 +5,7 @@ script/userconfig.py
 
 script/.multiroutes.py.swp
 script/.routes.py.swp
+node_modules/*
+serve.bat
+*_0
+*_1
