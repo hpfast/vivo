@@ -108,7 +108,7 @@ app.Container = function(parent_target) {
     this.tmpl = $.templates('#mainTmpl');
     this.html = this.tmpl.render(app.testdata);
     this.ourcontainer = $('<div id="'+this.uuid+'"  class="container">');
-    this.dataFetcher = new app.DataFetcher(this.ourcontainer);
+    this.dataFetcher = new app.DataFetcher(this.ourcontainer, this);
     this.ourcontainer.html(this.html)
     parent_target.append(this.ourcontainer);
     //setter function that triggers an event when routes are added
@@ -467,14 +467,14 @@ app.monthBuilder = function(event, data){
     var months = data.d.months;
     for (var i = 0; i < months.length; i++) {
         data.that.resOlve($(data.self).find('.pure-u-md-7-8'),//.find('.sol-wrapper'),
-                          that.ourcontainer,{sol_id:data.d.sol_id,month:months[i]}, '#monthTmpl');   
+                          that.ourcontainer,{sol_id:data.d.sol_id,month:months[i],container_id:that.uuid}, '#monthTmpl');   
     }
     
 }
 
 app.mapBackgroundBuilder = function (event, data) {
     var that = data.that;
-    var mapdivid = 'map-'+data.d.sol_id+'-'+data.d.month.id;
+    var mapdivid = data.that.uuid+'-map-'+data.d.sol_id+'-'+data.d.month.id;
     //that.maps.push(new app.Map(mapdivid,data));//app.Map will take care of triggering next event
     var map = new app.Map(mapdivid,data);
     //that.maps.push(map);
@@ -484,7 +484,7 @@ app.mapBackgroundBuilder = function (event, data) {
 app.mapForegroudBuilder = function(event, data) {
     var that = data.that;
     var routes = data.d.month.data;
-    var mapdivid = 'map-'+data.d.sol_id+'-'+data.d.month.id;
+    var mapdivid = that.uuid+'-map-'+data.d.sol_id+'-'+data.d.month.id;
     for (var i = 0; i<routes.length;i++){ 
             var route = routes[i];
             route.route = route.route
@@ -517,9 +517,13 @@ app.tearDownListeners = function(container){
     $(container).off({keys:'request-routes select-option-chosen click'});   
 }
 
-app.DataFetcher = function(context){
+app.DataFetcher = function(context, container){
     var context = context;
     this.fetchData = function(url){
+        //quickfix: kill container's maps and layers from here (should do it somewhere else)
+        container.maps = [];
+        container.layers = [];
+        container.routes = {};
         $.ajax({
             type: 'GET',
             url: url,
