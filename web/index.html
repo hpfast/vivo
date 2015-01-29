@@ -27,6 +27,7 @@
     <script src="js/leaflet-label.js"></script>
     <script src="js/leaflet-omnivore.min.js"></script>
     <script src="js/jquery-2.1.1.min.js"></script>
+    <script src="js/jquery-svg-shim.js"></script>
     <script src="js/jsrender.min.js"></script>
     <script src='js/main.js'></script>
     <script src='js/config.js'></script>
@@ -72,7 +73,7 @@
     <script id="routeListTmpl" type="text/x-jsrender">
             <div class="route-list-obj" data-id={{:id}}>
                 <div class="route-line">
-                    <p class="route-id">{{:id}}</p>
+                    <p class="route-id">{{:name}}</p>
                         {{for route}}
                             <div class="route-node">
                                 <span class="node-num">{{:node}}</span>
