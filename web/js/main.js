@@ -113,6 +113,7 @@ app.Container = function(parent_target) {
     parent_target.append(this.ourcontainer);
     //setter function that triggers an event when routes are added
     this.addRoutes = function(data, context){
+        //console.log('addRoutesSetter')
         context.routes = data;
         $(context.ourcontainer).trigger('routesadded',context);
     };
@@ -122,6 +123,7 @@ app.Container = function(parent_target) {
     //this could be a generalized function that just appends the div, renders the given template,
     //and sets the resulting html as the content of the template, then triggering another custom event.
     this.resOlve = function(targetdiv, container, data, template){
+        //console.log('resOlve')
         var that = this;
         var dfd = $.Deferred();
         var tmpl = $.templates(template);
@@ -182,7 +184,7 @@ app.Map = function (mapdivid,data) {
                          {zoomControl: false,
                           attributionControl: false
                          }
-                        ).setView([-5.07, 18.79], 6);
+                        ).setView([-4.91, 18.79], 7);
     this.data.that.maps.push(this);                
     //big block of stuff for displaying and attributing background map
     var mapQuestAttr = 'Tiles Courtesy of <a href="http://www.mapquest.com/">MapQuest</a> &mdash; ';
@@ -195,7 +197,10 @@ app.Map = function (mapdivid,data) {
                           {attribution:osmDataAttr}
                          );
     var mq=L.tileLayer(mopt.url,mopt.options);
-    mq.addTo(this.map);
+    
+    // Jan 2015: For now, hiding map tiles to declutter look
+    //mq.addTo(this.map);
+    
     this.mapid = mapdivid;
     
     app.hzlayer = L.geoJson(null, {
@@ -203,7 +208,7 @@ app.Map = function (mapdivid,data) {
             return {
                 color:'#333',
                 weight: 1,
-                opacity: 1,
+                opacity: 0.2,
                 fillOpacity:'0'
             };
         }
@@ -219,10 +224,10 @@ app.Map = function (mapdivid,data) {
     };
     
     var myIcon = L.icon({
-        iconUrl: 'myicon.png',
-        iconSize: [6,6],
-        iconAnchor: [0, 0],
-        labelAnchor: [6, 0] // as I want the label to appear 2px past the icon (10 + 2 - 6)
+        iconUrl: 'hospital.png',
+        iconSize: [20,20],
+        iconAnchor: [15, 15],
+        labelAnchor: [15, 15] // as I want the label to appear 2px past the icon (10 + 2 - 6)
     });
     
     var myDivIcon = L.divIcon({
@@ -232,14 +237,32 @@ app.Map = function (mapdivid,data) {
     
     app.hslayer = L.geoJson(null, {
          pointToLayer: function(feature, latlng){
-            var marker = new L.marker(latlng,{icon:myIcon});
-            marker.bindLabel(feature.properties.hz_id.toString(),{className:'label'});
-             return(marker);
+           var myDivIcon2 = L.divIcon({
+             className: 'my-div-icon',
+             html: feature.properties.name + ' (' + feature.properties.hz_id.toString() + ')'
+            });
+
+           var myDivIcon2 = L.divIcon({
+             className: 'my-div-icon',
+             html: feature.properties.hz_id.toString()
+            });
+
+            //var marker = new L.marker(latlng,{icon:myIcon});
+            var marker = new L.marker(latlng,{noHide:true, icon:myDivIcon2 });
+            
+            marker.bindLabel(
+                //feature.properties.hz_id.toString(),{className:'label'}
+                feature.properties.name,{className:'label'}
+                );
+            return(marker);
+
              //return L.circleMarker(latlng,geojsonMarkerOptions)
              //return L.marker(latlng,{icon:myDivIcon});
              //return L.marker(latlng,{icon:myIcon})
             // .bindLabel(feature.properties.hz_id.toString(),{zoomAnimation:false,noHide:true,pane:'popupPane',direction:'auto'}).bindPopup(feature.properties.hz_id.toString());
         }
+
+
 //        ,
 //        onEachFeature: function(feature,layer){
 //            var label = new L.Label();
@@ -252,6 +275,7 @@ app.Map = function (mapdivid,data) {
     var dfd = $.Deferred();
     
     this.triggerEvents = function(){
+        //console.log("triggerevents")
         $(this.data.that.ourcontainer).trigger('background-layers-added',this.data);
     };
     
@@ -266,7 +290,10 @@ app.Map = function (mapdivid,data) {
     },this);
     
     this.addnextlayer = function(){
-        omnivore.geojson('data/hosps-bandundu.geojson',null,app.hslayer).on('ready',function(){$(app).trigger('ok')}).addTo(this.map).bringToFront();    
+        //console.log("addnextlayer")
+        omnivore.geojson('data/hosps-bandundu.geojson',null,app.hslayer)
+        .on('ready', function(){$(app).trigger('ok')})
+        .addTo(this.map).bringToFront();    
     };
     
     omnivore.topojson('data/hz-bandundu.topojson',null,app.hzlayer)
@@ -343,9 +370,10 @@ app.getCoords = function(obj, val) {
 
 //draw all routes
 app.drawRoutes = function(event, data){
+    //console.log('drawRoutes')
     var routes = data.routes;
     for (var i=0; i<routes.length;i++){
-        app.drawRoute(null,{that:data.that,route:routes[i],mapid:data.mapid}); 
+        app.drawRoute(null,{'that':data.that,'route':routes[i],'mapid':data.mapid, 'route_index': i}); 
     }
     $(data.that.ourcontainer).trigger('routes-drawn', {mapid:data.mapid,that:data.that,routes:routes});
 
@@ -353,34 +381,121 @@ app.drawRoutes = function(event, data){
 
 //get the route, look up the points by hosp id and make a line and add it to the map
 app.drawRoute = function(event, data){
+    //console.log('drawRoute')
     var colorhex = '#' + (Math.random().toFixed(6).toString(16)).slice(2);
-    console.log(event);
-    console.log(data.route.sol_id);
+    //console.log(event);
+    //console.log(data.route.sol_id);
     var results = app.getObjects(data.that.routes,'route_id',data.route.route_id, 'route');
+    var pickup_node = app.getObjects(data.that.routes,'route_id',data.route.route_id, 'pickup')[0]
+    var dropoff_node = app.getObjects(data.that.routes,'route_id',data.route.route_id, 'dropoff')[0];
+
     var route = results[0]; //just one for now
-    
     //we need to draw the polylines and draw the points separately
-    var latlngs = [];
-    //always start at 223
-    if (route[0] != '223'){
-        route.unshift('223');
-    };
-    for (var i in route){
-        var c = app.getCoords(app.geodata.hospitals.features,route[i]);
-        latlngs.push(L.latLng(c[1],c[0]));
+    // var latlngs = [];
+    // //always start at 223
+    // if (route[0] != '223'){
+    //     route.unshift('223');
+    // };
+
+    // for (var i in route){
+    //     var c = app.getCoords(app.geodata.hospitals.features,route[i]);
+    //     latlngs.push(L.latLng(c[1],c[0]));
+    // }
+
+    // var polyline = L.polyline(latlngs, {color: colorhex})
+    //   polyline.addLatLng(app.geodata.kikwit)
+    //   polyline.bindPopup(data.route.route_id+': '+route); //add the depot
+
+
+    mylines = [];
+    var supervisionleg=false;
+    for (i = 0; i < route.length-1; i++) {
+      var latlngs = [];
+      var c = app.getCoords(app.geodata.hospitals.features,route[i]);
+      latlngs.push(L.latLng(c[1],c[0]));
+      var c = app.getCoords(app.geodata.hospitals.features,route[i+1]);
+      latlngs.push(L.latLng(c[1],c[0]));
+      mymod = data.route_index % 4;
+      routeclass = 'route' + data.route_index.toString() + " " + 'mod' + mymod.toString();
+
+        var myIcon = L.icon({
+            iconUrl: 'hospital.png',
+            iconSize: [20,20],
+            iconAnchor: [15, 15],
+            labelAnchor: [15, 15] // as I want the label to appear 2px past the icon (10 + 2 - 6)
+        });
+
+
+      if (route[i]==pickup_node) {
+        supervisionleg=true;
+        //console.log(latlngs)
+        var marker = new L.marker(latlngs[0],{icon:myIcon});
+        //mylines.push(marker);
+      }
+      if (route[i]==dropoff_node) {
+        supervisionleg=false;
+      }
+      if (supervisionleg) {
+        myclass = "Leg SupervisionLeg " + routeclass;
+        //var polyline = L.polyline(latlngs, {color: colorhex, className: myclass})
+        var polyline = L.polyline(latlngs, {className: myclass});
+        //polyline.addLatLng(app.geodata.kikwit)
+        //polyline.bindPopup(data.route.route_id+': '+route);
+        //console.log( route[i], route[i+1])
+        mylines.push(polyline);
+        myclass = "Leg OtherLegs " + routeclass;
+        var polyline = L.polyline(latlngs, {className: myclass});
+        //var polyline = L.polyline(latlngs, {color: colorhex, className: myclass})
+        //polyline.addLatLng(app.geodata.kikwit)
+        //polyline.bindPopup(data.route.route_id+': '+route);
+        //console.log( route[i], route[i+1])
+        mylines.push(polyline);
+      }
+      else {
+        myclass = "Leg OtherLegs " + routeclass;
+        //console.log(myclass)
+        var polyline = L.polyline(latlngs, {className: myclass})
+        //polyline.addLatLng(app.geodata.kikwit)
+        //polyline.bindPopup(data.route.route_id+': '+route);
+        //console.log( route[i], route[i+1])
+        mylines.push(polyline);
+      }
+
     }
-    var polyline = L.polyline(latlngs,{color: colorhex}).addLatLng(app.geodata.kikwit).bindPopup(data.route.route_id+': '+route); //add the depot
+
+    var fg = L.featureGroup(mylines)
+        .bindPopup('Hello world!')
+        .on('mouseover', function() {
+        })
+   
     //save reference to layer!
-    data.that.layers.push({route_id:data.route.route_id,layer:polyline});
+    data.that.layers.push({
+        route_id:data.route.route_id,
+        layer:fg // was polyline previously
+    });
+
+
     var ourmap = app.getMap(data.that.maps, 'mapid', data.mapid);
     //ourmap.map.addLayer(polyline);
     $(app).on('ok',ourmap,function(event){
-    polyline.addTo(event.data.map).bringToFront();
+      //polyline.addTo(event.data.map).bringToFront();
+      fg.addTo(event.data.map).bringToFront();
+      if (marker) {
+        marker.addTo(event.data.map) //.bringToFront();
+      } 
+      $('.FirstLeg, .SupervisionLeg')
+        //.css({'stroke-dasharray':'5,5', 'stroke-width': '2px', 'color': 'red'})
+        .removeAttr('stroke-width')
+        .removeAttr('stroke')
+        .removeAttr('stroke-opacity')
+        //.removeAttr('stroke-linejoin')
+        .removeAttr('stroke-linecap')
     })
 }
 
 
 app.addRoutesToList = function(event, data) {
+    //console.log("addroutestolist")
     var ourmap = app.getMap(data.that.maps, 'mapid', data.mapid);
     var mapcontainer = ourmap.map._container;
     var listcontainer = $('<div class="route-list" id="list-'+data.mapid+'">');
@@ -389,17 +504,17 @@ app.addRoutesToList = function(event, data) {
     for (var i=0;i<data.routes.length;i++){
         ourroutes.push(app.formatRouteForList(data.routes[i]));
     };
-    ourroutes.sort(function(a,b){
-        return a.order - b.order;
-    });
+    // ourroutes.sort(function(a,b){
+    //     return a.order - b.order;
+    // });
     data.that.resOlve(listcontainer,data.that.ourcontainer,ourroutes,'#routeListTmpl');
-    
-    
+  
 }
 
 //parse the route object to add hooks for styling the node types
 app.formatRouteForList = function(route){
-    console.log(route);
+    //console.log(route);
+    //console.log("formatrouteforlist")
     var out = {};
     out.id = route.route_id;
     out.cost = route.route.cost;
@@ -427,23 +542,46 @@ app.formatRouteForList = function(route){
 };
 
 app.addRouteListListeners = function(event, data){
+    //console.log("addroutelisteners")
     data.self.on('mouseover',data,function(event){
         var routeid = event.currentTarget.getAttribute('data-id');
-        console.log('we hovered over '+routeid);
-        var targetlayer = app.getMap(event.data.that.layers,'route_id',routeid);//reuse getMap because it returns a single item from an array
-        targetlayer.originalStyle = targetlayer.layer.options;
-        targetlayer.layer.setStyle({weight:10,color:'#ff9306'});
+        //console.log('we hovered over '+routeid);
+        //targetlayer.originalStyle = targetlayer.layer.options;
+        //targetlayer.layer.setStyle({weight:10,color:'#ff9306'});
+        var featuregroup = app.getMap(event.data.that.layers,'route_id',routeid);//reuse getMap because it returns a single item from an array
+        //console.log(featuregroup)
+        $('path').addClass('lowlight');
+        featuregroup.layer.eachLayer( function(layer) {
+            test = L.DomUtil.get(layer);
+            temp = $(test._path);
+            //console.log(temp)
+            //temp.addClass('hello');
+            //$('.route10').removeClass('highlight')
+            temp.removeClass('lowlight');
+            temp.addClass('highlight').show();
+        })
             
     }).on('mouseout',data,function(event){
         var routeid = event.currentTarget.getAttribute('data-id');
-        var targetlayer = app.getMap(event.data.that.layers,'route_id',routeid);
-        targetlayer.layer.setStyle(targetlayer.originalStyle);
+        var featuregroup = app.getMap(event.data.that.layers,'route_id',routeid);
+        featuregroup.layer.eachLayer( function(layer) {
+            test = L.DomUtil.get(layer);
+            temp = $(test._path);
+            //console.log(temp)
+            //temp.addClass('hello');
+            //$('.route10').removeClass('highlight')
+            temp.removeClass('highlight');
+        })
+        $('path').removeClass('lowlight');
+
+        //targetlayer.layer.setStyle(targetlayer.originalStyle);
         
     });
 }
 
 app.runBuilder = function(event, data){
     //first loop:
+    //console.log("runbuilder")
     for (var i in data.routes){
         var wrapper= $(data.ourcontainer).find('.map-wrapper');
         var uuid = app.UUID.generate();
@@ -454,6 +592,7 @@ app.runBuilder = function(event, data){
 }
 
 app.solutionBuilder = function(event, data){
+    //console.log("solutionbuilder")
     var that = data.that;
     for (var i=0;i<data.d.data.length;i++){
         data.that.resOlve($(data.self),//.find('.run-wrapper'),
@@ -463,6 +602,7 @@ app.solutionBuilder = function(event, data){
 
 
 app.monthBuilder = function(event, data){
+    //console.log("monthbuilder")
     var that = data.that;
     var months = data.d.months;
     for (var i = 0; i < months.length; i++) {
@@ -473,6 +613,7 @@ app.monthBuilder = function(event, data){
 }
 
 app.mapBackgroundBuilder = function (event, data) {
+    //console.log("mpbackgroundbuilder")
     var that = data.that;
     var mapdivid = 'map-'+data.d.sol_id+'-'+data.d.month.id;
     //that.maps.push(new app.Map(mapdivid,data));//app.Map will take care of triggering next event
@@ -482,15 +623,16 @@ app.mapBackgroundBuilder = function (event, data) {
 }
 
 app.mapForegroudBuilder = function(event, data) {
+    //console.log("mpforegroundbuilder")
     var that = data.that;
     var routes = data.d.month.data;
     var mapdivid = 'map-'+data.d.sol_id+'-'+data.d.month.id;
     for (var i = 0; i<routes.length;i++){ 
             var route = routes[i];
-            route.route = route.route
+            route.route = route.nodes
               .replace(/{/, '').replace(/}/, '').split(',');
     }
-    $(that.ourcontainer).trigger('routesready',{that:that,routes:routes,mapid:mapdivid});
+    $(that.ourcontainer).trigger('routesready',{that:that, routes:routes, mapid:mapdivid});
     $(that.ourcontainer).trigger('mapsadded');
     
 }
@@ -533,7 +675,7 @@ app.DataFetcher = function(context){
               });
         })
           .fail(function(data,statusText,jqXHR){
-            console.log(statusText,jqXHR);
+            //console.log(statusText,jqXHR);
         }); 
     }
 };
@@ -631,4 +773,4 @@ $(document).ready(function($){
     }).done(function(data,statusText,jqXHR){
         $(app).trigger('geodatafetched',data)
     }); 
-});
+});;
