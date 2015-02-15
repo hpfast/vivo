@@ -9,3 +9,4 @@ serve.bat
 *_1
 =======
 web/js/config.js
+*.db

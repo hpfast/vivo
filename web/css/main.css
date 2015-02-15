@@ -2,17 +2,16 @@
     box-sizing: border-box
 }
 
-
 .map{
-    width:300px;
-    height:250px;
+    width:500px;
+    height:700px;
 /*    float:left;*/
     margin:5px;
 }
 
 .map-box{
-    width:400px;
-    height:400px;
+    width:700px;
+    height:700px;
     float:left;
     padding:5px;
 }
@@ -122,4 +121,46 @@ h1{clear:both}
 .label{
     background-color:rgba(255,255,255,0.7);
     border-radius:5px;
+}
+
+.SupervisionLeg {
+    stroke-width: 7px;
+    opacity: 0.3;
+}
+
+.OtherLegs {
+    stroke-width: 2px;
+    opacity: 1;
+}
+
+.OtherLegs .highlight {
+    opacity: 1;
+}
+
+.lowlight {
+    opacity: 0.1;
+}
+
+.leaflet-container {
+    background-color: transparent;
+}
+
+.run-wrapper h3 {
+    margin: 0px;
+}
+
+.mod0{
+  stroke: #e41a1c;    
+}
+.mod1{
+  stroke: #377eb8;    
+}
+.mod2{
+  stroke: #4daf4a;    
+}
+.mod3{
+  stroke: #984ea3;    
+}
+.mod4{
+  stroke: #ff7f00;    
 }
