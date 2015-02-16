@@ -10,3 +10,5 @@ serve.bat
 =======
 web/js/config.js
 *.db
+
+*.swp
