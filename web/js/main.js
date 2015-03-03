@@ -203,6 +203,25 @@ app.Map = function (mapdivid,data) {
     
     this.mapid = mapdivid;
     
+    var that = this;
+    this.labeller = function(feature, layer) {
+        var themap = that.map;
+        
+        //method with leaflet.label, strange results
+//        var label = new L.Label({noHide: true, zoomAnimation:false,pane:'popupPane'});
+//        label.setContent(feature.properties.name);
+//        label.setLatLng(layer.getBounds().getCenter());
+//        themap.showLabel(label);
+    
+        var point = layer.getBounds().getCenter();
+        var myDivIcon = L.divIcon({
+            className: 'my-div-icon',
+            html:feature.properties.name
+        });
+        L.marker(point, {icon: myDivIcon}).addTo(themap);
+        
+    }
+    
     app.hzlayer = L.geoJson(null, {
         style: function(feature){
             return {
@@ -211,7 +230,8 @@ app.Map = function (mapdivid,data) {
                 opacity: 0.2,
                 fillOpacity:'0'
             };
-        }
+        },
+        onEachFeature: this.labeller
     })
     
         var geojsonMarkerOptions = {
@@ -296,7 +316,10 @@ app.Map = function (mapdivid,data) {
         .addTo(this.map).bringToFront();    
     };
     
-    omnivore.topojson('data/hz-bandundu.topojson',null,app.hzlayer)
+    
+    
+    
+    omnivore.geojson('data/hz-test.geojson',null,app.hzlayer)
     .addTo(this.map);
 
     
